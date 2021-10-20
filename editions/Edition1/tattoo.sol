@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.2;
+
+import "../IFurballPart.sol";
+
+/// @author LFG Gaming LLC
+contract FurballsEdition1tattoo is IFurballPart {
+  mapping(uint8 => uint8[]) private _options;
+
+  constructor() {
+    _options[1].push(0);
+    _options[1].push(1);
+    _options[2].push(2);
+    _options[1].push(3);
+    _options[3].push(4);
+    _options[3].push(5);
+  }
+
+  function slot() external pure override returns(string memory) {
+    return "Tattoo";
+  }
+
+  function options(uint8 rarity) external view override returns(uint8[] memory) {
+    return _options[rarity];
+  }
+
+  function name(uint8 idx) external pure override returns(string memory) {
+    if (idx == 0) return "Scar";
+    if (idx == 1) return "Tears";
+    if (idx == 2) return "Blush";
+    if (idx == 3) return "Freckles";
+    if (idx == 4) return "Bandaid";
+    if (idx == 5) return "Paw";
+    return "";
+  }
+
+  function count() external pure override returns(uint8) {
+    return uint8(6);
+  }
+
+  function data() external pure override returns(bytes memory) {
+    return hex"004c040607040003000303030203010403020403040a050075000607040003000303030203010403020403040a050076000607040003000303030203010403020403040a05007700060105007800004f0306070401bdefff03000303030303010403020403040a05011e0006070401bdefff03000303030303010403020403040a05011f0006070401bdefff03000303030303010403020403040a0501200000170206020401ffa6d305014c0006020401ffa6d305014d000058010001010001800401040401ffa1de00000094000100b3000800050001040401ffa1de0000009d000100b9000800020001040401ffa1de00000099000100a9000800020001040401ffa1de000000a1000100af0008000400005a0806020401dec2ff0502890006020401dec2ff05028a0006020401dec2ff05028b0006020401dec2ff05028c0006020401dec2ff05028d0006020401dec2ff05028e0006020401dec2ff05028f0006030100024604040503000000ad0502050706044915148709048709044915944b749984e393160000009d000100b200090002000a00010002050706042984149544049544042984943d6244a4010d875400000098000100b000090002000a000100020507060458721480950480950458729453476684cc64770000009e000100b800090002000a0001000205070604188114982104982104188194381722a40122751500000093000100b300090002000a000100060105062500";
+  }
+}

@@ -1,0 +1,455 @@
+Searching 34 files for "seed"
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/Furballs.sol:
+  165  
+  166    /// @notice Mints a new furball
+  167:   /// @dev Recursive function; generates randomization seed for the edition
+  168    /// @param to The recipient of the furball
+  169    /// @param nonce A recursive counter to prevent infinite loops
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/FurballEdition.sol:
+  116        return 0;
+  117      }
+  118:     return (roll(seed) % opts.length) + 1;
+  119    }
+  120  
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/IFurballEdition.sol:
+    9    function live() external view returns(bool);
+   10    function isLiveFor(address addr) external view returns(bool);
+   11:   function spawn(uint256 seed) external returns (uint256);
+   12    function render(uint256 tokenId) external view returns (string memory);
+   13    function getRarityBoostPercent(uint256 tokenId) external view returns(uint64);
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/engines/ILootEngine.sol:
+   11  interface ILootEngine is IERC165 {
+   12    /// @notice When a Furball comes back from exploration, potentially give it some loot.
+   13:   function dropLoot(uint256 seed, FurLib.RewardModifiers memory mods, uint64 boost) external returns(uint256);
+   14  
+   15    /// @notice Players can pay to re-roll their loot drop on a Furball
+   16:   function reDropLoot(uint256 seed, uint256 item) external returns(uint256);
+   17  
+   18    /// @notice Calculates the effects of the loot in a Furball's inventory
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/engines/LootEngine.sol:
+   26  
+   27    function dropLoot(
+   28:     uint256 seed, FurLib.RewardModifiers memory mods, uint64 boost
+   29    ) external virtual override onlyFurballs returns(uint256) {
+   30      return 0;
+   31    }
+   32  
+   33:   function reDropLoot(uint256 seed, uint256 item) external virtual override returns(uint256) {
+   34      return item;
+   35    }
+
+7 matches across 5 files
+
+
+Searching 34 files for "seed"
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/Furballs.sol:
+  165  
+  166    /// @notice Mints a new furball
+  167:   /// @dev Recursive function; generates randomization seed for the edition
+  168    /// @param to The recipient of the furball
+  169    /// @param nonce A recursive counter to prevent infinite loops
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/engines/ILootEngine.sol:
+   11  interface ILootEngine is IERC165 {
+   12    /// @notice When a Furball comes back from exploration, potentially give it some loot.
+   13:   function dropLoot(uint256 seed, FurLib.RewardModifiers memory mods, uint64 boost) external returns(uint256);
+   14  
+   15    /// @notice Players can pay to re-roll their loot drop on a Furball
+   16:   function reDropLoot(uint256 seed, uint256 item) external returns(uint256);
+   17  
+   18    /// @notice Calculates the effects of the loot in a Furball's inventory
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/engines/LootEngine.sol:
+   26  
+   27    function dropLoot(
+   28:     uint256 seed, FurLib.RewardModifiers memory mods, uint64 boost
+   29    ) external virtual override onlyFurballs returns(uint256) {
+   30      return 0;
+   31    }
+   32  
+   33:   function reDropLoot(uint256 seed, uint256 item) external virtual override returns(uint256) {
+   34      return item;
+   35    }
+
+5 matches across 3 files
+
+
+Searching 34 files for "seed"
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/Furballs.sol:
+  165  
+  166    /// @notice Mints a new furball
+  167:   /// @dev Recursive function; generates randomization seed for the edition
+  168    /// @param to The recipient of the furball
+  169    /// @param nonce A recursive counter to prevent infinite loops
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/engines/LootEngine.sol:
+   26  
+   27    function dropLoot(
+   28:     uint256 seed, FurLib.RewardModifiers memory mods, uint64 boost
+   29    ) external virtual override onlyFurballs returns(uint256) {
+   30      return 0;
+
+2 matches across 2 files
+
+
+Searching 34 files for ".roll("
+
+0 matches
+
+Searching 34 files for " roll("
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/FurballEdition.sol:
+   95  
+   96    function rollRarity() public returns(uint8) {
+   97:     uint256 rolled = roll();
+   98      uint16 r = uint16(rolled % 1000);
+   99      // if (r >= 738) console.log('roll', FurLib.uint2str(rolled), FurLib.uint2str(r));
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/utils/Dice.sol:
+    9    uint256 LAST = 0;
+   10  
+   11:   function roll(uint256 seed) public returns (uint256) {
+   12      NONCE++;
+   13      LAST = uint256(
+
+2 matches across 2 files
+
+
+Searching 34 files for " roll("
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/FurballEdition.sol:
+   95  
+   96    function rollRarity() public returns(uint8) {
+   97:     uint256 rolled = roll();
+   98      uint16 r = uint16(rolled % 1000);
+   99      // if (r >= 738) console.log('roll', FurLib.uint2str(rolled), FurLib.uint2str(r));
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/utils/Dice.sol:
+    9    uint256 LAST = 0;
+   10  
+   11:   function roll(uint256 seed) public returns (uint256) {
+   12      NONCE++;
+   13      LAST = uint256(
+
+2 matches across 2 files
+
+
+Searching 34 files for "(roll()"
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/FurballEdition.sol:
+   78  
+   79    function spawn() external override returns (uint256) {
+   80:     uint8 palette = uint8(roll() % 31);
+   81      uint256 ret = palette * 256;
+   82      for (uint8 slot=0; slot<slots.length; slot++) {
+   ..
+  116        return 0;
+  117      }
+  118:     return (roll() % opts.length) + 1;
+  119    }
+  120  
+
+2 matches in 1 file
+
+
+Searching 34 files for "roll(0"
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/FurballEdition.sol:
+   78  
+   79    function spawn() external override returns (uint256) {
+   80:     uint8 palette = uint8(roll(0) % 31);
+   81      uint256 ret = palette * 256;
+   82      for (uint8 slot=0; slot<slots.length; slot++) {
+   ..
+   95  
+   96    function rollRarity() public returns(uint8) {
+   97:     uint256 rolled = roll(0);
+   98      uint16 r = uint16(rolled % 1000);
+   99      // if (r >= 738) console.log('roll', FurLib.uint2str(rolled), FurLib.uint2str(r));
+  ...
+  116        return 0;
+  117      }
+  118:     return (roll(0) % opts.length) + 1;
+  119    }
+  120  
+
+3 matches in 1 file
+
+
+Searching 34 files for "roll("
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/FurballEdition.sol:
+   78  
+   79    function spawn() external override returns (uint256) {
+   80:     uint8 palette = uint8(roll() % 31);
+   81      uint256 ret = palette * 256;
+   82      for (uint8 slot=0; slot<slots.length; slot++) {
+   ..
+   95  
+   96    function rollRarity() public returns(uint8) {
+   97:     uint256 rolled = roll();
+   98      uint16 r = uint16(rolled % 1000);
+   99      // if (r >= 738) console.log('roll', FurLib.uint2str(rolled), FurLib.uint2str(r));
+  ...
+  116        return 0;
+  117      }
+  118:     return (roll() % opts.length) + 1;
+  119    }
+  120  
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/utils/Dice.sol:
+    9    uint32 LAST = 0;
+   10  
+   11:   function roll(uint32 seed) public returns (uint256) {
+   12      // NONCE++;
+   13      // LAST = uint256(
+
+4 matches across 2 files
+
+
+Searching 35 files for "Furballs, LLC"
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/Furballs.sol:
+   14  
+   15  /// @title Furballs
+   16: /// @author Furballs, LLC
+   17  /// @notice Mints Furballs on the Ethereum blockchain
+   18  /// @dev https://furballs.com/contract
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/engines/ILootEngine.sol:
+    7  
+    8  /// @title ILootEngine
+    9: /// @author Furballs, LLC
+   10  /// @notice The loot engine is patchable by replacing the Furballs' engine with a new version
+   11  interface ILootEngine is IERC165 {
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/engines/LootEngine.sol:
+   10  
+   11  /// @title LootEngine
+   12: /// @author Furballs, LLC
+   13  /// @notice Base implementation of the loot engine
+   14  abstract contract LootEngine is ERC165, ILootEngine, Dice {
+
+3 matches across 3 files
+
+
+Searching 36 files for "pragma solidity ^0.8.2;"
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/Fur.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/Furballs.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "hardhat/console.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/Leaderboard.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "hardhat/console.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/Leaderboards.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "hardhat/console.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "./FurballEdition.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/FurballEdition.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "./IFurballEdition.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/IFurballEdition.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/IFurballPart.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  /// @title IFurballsPart
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/IFurballPaths.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  /// @title IFurballsPaths
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/body.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPart.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/ears.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPart.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/eyes.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPart.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/headtop.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPart.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/mouth.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPart.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/neck.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPart.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/Paths0.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPaths.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/Paths1.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPaths.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/Paths2.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPaths.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/Paths3.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPaths.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/Paths4.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPaths.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/Paths5.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPaths.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/Paths6.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPaths.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/tail.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPart.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/tattoo.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPart.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/editions/Edition1/weapon.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "../IFurballPart.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/engines/EngineA.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "./LootEngine.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/engines/ILootEngine.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/engines/LootEngine.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "hardhat/console.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/utils/AnonymiceDice.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  abstract contract Dice {
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/utils/Dice.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "./FurLib.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/utils/FurLib.sol:
+    1  // SPDX-License-Identifier: MIT
+    2: pragma solidity ^0.8.2;
+    3  
+    4  /// @title FurLib
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/utils/Moderated.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "hardhat/console.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/utils/Pausable.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "./Moderated.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/utils/Referrers.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "hardhat/console.sol";
+
+/Users/zaneclaes/zdrive/zaneclaes/Programming/Furballs/contracts/utils/Stakeholders.sol:
+    1  // SPDX-License-Identifier: UNLICENSED
+    2: pragma solidity ^0.8.2;
+    3  
+    4  import "hardhat/console.sol";
+
+35 matches across 35 files
