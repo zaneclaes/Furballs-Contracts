@@ -33,7 +33,7 @@ library FurLib {
     uint32 happinessPoints;
     uint32 energyPoints;
     uint32 zone;
-    uint8 level;          // Current EXP => level
+    uint16 level;         // Current EXP => level
   }
 
   // For sale via loot engine.

@@ -9,6 +9,9 @@ import "../utils/FurLib.sol";
 /// @author LFG Gaming LLC
 /// @notice The loot engine is patchable by replacing the Furballs' engine with a new version
 interface ILootEngine is IERC165 {
+  /// @notice Max experience (and thus max level) could grow over time
+  function maxExperience() external view returns(uint32);
+
   /// @notice When a Furball comes back from exploration, potentially give it some loot.
   function dropLoot(uint32 intervals, FurLib.RewardModifiers memory mods) external returns(uint256);
 
@@ -16,7 +19,7 @@ interface ILootEngine is IERC165 {
   function upgradeLoot(uint256 item, uint32 badLuck) external returns(uint256);
 
   /// @notice Some zones may have preconditions
-  function enterZone(uint256[] memory tokenIds, uint32 zone) external returns(uint256);
+  function enterZone(uint256 tokenId, uint32 zone, uint256[] memory team) external returns(uint256);
 
   /// @notice Calculates the effects of the loot in a Furball's inventory
   function getRewardModifiers(

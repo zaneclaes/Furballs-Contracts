@@ -9,14 +9,16 @@ import "./engines/ILootEngine.sol";
 import "./engines/EngineA.sol";
 import "./utils/FurLib.sol";
 import "./utils/Stakeholders.sol";
+import "./utils/Maths.sol";
 import "./utils/Governance.sol";
+import "./utils/Exp.sol";
 import "./Fur.sol";
 
 /// @title Furballs
 /// @author LFG Gaming LLC
 /// @notice Mints Furballs on the Ethereum blockchain
 /// @dev https://furballs.com/contract
-contract Furballs is ERC721Enumerable, Stakeholders {
+contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   Fur public fur;
 
   IFurballEdition[] editions;
@@ -24,6 +26,8 @@ contract Furballs is ERC721Enumerable, Stakeholders {
   ILootEngine public engine;
 
   Governance public governance;
+
+  Maths public maths;
 
   // tokenId => furball data
   mapping(uint256 => FurLib.Furball) public furballs;
@@ -69,25 +73,44 @@ contract Furballs is ERC721Enumerable, Stakeholders {
     fur.purchaseSnack(_approvedSender(), tokenId, engine.getSnack(snackId));
   }
 
+  /// @notice Begins battle/explore modes by changing zones & collecting rewards
+  /// @dev See also: playMany, _play
+  function playOne(uint256 tokenId, uint32 zone) external {
+    uint256[] memory team;
+    _play(tokenId, zone, _approvedSender(), team);
+  }
+
   /// @notice Begins exploration mode with the given furballs
   /// @dev Multiple furballs accepted at once to reduce gas fees
   /// @param tokenIds The furballs which should start exploring
   /// @param zone The explore zone (otherwize, zero for battle mode)
-  function play(uint256[] memory tokenIds, uint32 zone) external {
-    zone = uint32(engine.enterZone(tokenIds, zone));
+  function playMany(uint256[] memory tokenIds, uint32 zone) external {
     address sender = _approvedSender();
 
     for (uint256 i=0; i<tokenIds.length; i++) {
-      // The engine is allowed to force furballs into exploration mode
-      // This allows it to end a battle early, which will be necessary in PvP
-      require(ownerOf(tokenIds[i]) == sender || address(engine) == sender, 'OWN');
-      _collect(tokenIds[i]);
-      furballs[tokenIds[i]].zone = zone;
-      emit Play(
-        tokenIds[i],
-        fur.balanceOf(ownerOf(tokenIds[i])),
-        stats(tokenIds[i]));
+      _play(tokenIds[i], zone, sender, tokenIds);
     }
+  }
+
+  /// @notice Internal implementation of playMany/playOne
+  function _play(uint256 tokenId, uint32 zone, address sender, uint256[] memory team) internal {
+    address owner = ownerOf(tokenId);
+
+    // The engine is allowed to force furballs into exploration mode
+    // This allows it to end a battle early, which will be necessary in PvP
+    require(owner == sender || address(engine) == sender, 'OWN');
+
+    // Check zone preconditions
+    zone = uint32(engine.enterZone(tokenId, zone, team));
+
+    // Run reward collection
+    _collect(tokenId);
+
+    // Set new zone
+    furballs[tokenId].zone = zone;
+
+    // Emit state
+    emit Play(tokenId, fur.balanceOf(owner), stats(tokenId));
   }
 
   /// @notice Re-dropping loot allows players to pay $FUR to re-roll an inventory slot
@@ -146,7 +169,7 @@ contract Furballs is ERC721Enumerable, Stakeholders {
         tokenId,
         editions[tokenId % 256].getRewardModifiers(
           tokenId,
-          expToLevel(furballs[tokenId].experience),
+          expToLevel(furballs[tokenId].experience, engine.maxExperience()),
           zone
         )
       ),
@@ -166,15 +189,16 @@ contract Furballs is ERC721Enumerable, Stakeholders {
       _rewardModifiers(tokenId, furballs[tokenId].zone, uint32(balanceOf(owner)));
 
     if (!FurLib.isBattleZone(mods.zone)) { // Explore!
-      uint32 exp = _expFromExplore(tokenId, duration, mods);
+      uint32 exp = _expFromExplore(duration, mods);
       uint32 has = furballs[tokenId].experience;
-      if (exp > 0 && has < (FurLib.Max32 - exp)) {
-        uint8 oldLevel = expToLevel(has);
+      uint32 max = engine.maxExperience();
+      if (exp > 0) {
+        uint16 oldLevel = computeLevel(has, max);
 
-        has += exp;
+        has = (has < (max - exp)) ? (has + exp) : max;
         furballs[tokenId].experience = has;
 
-        uint8 newLevel = expToLevel(has);
+        uint16 newLevel = computeLevel(has, max);
         if (newLevel > oldLevel) {
           governance.transferDelegates(owner, owner, oldLevel + 1, newLevel + 1);
         }
@@ -224,10 +248,10 @@ contract Furballs is ERC721Enumerable, Stakeholders {
     require(cnt < max, "MAX");
 
     // Create the memory struct that represens the furball
-    uint256 furballNumber = totalSupply() + 1;
-    uint64 ts = uint64(block.timestamp);
     uint256[] memory inventory;
-    furballs[tokenId] = FurLib.Furball(furballNumber, cnt, 0, 0, ts, ts, ts, inventory);
+    furballs[tokenId] = FurLib.Furball(
+      totalSupply() + 1, cnt, 0, 0,
+      uint64(block.timestamp), uint64(block.timestamp), uint64(block.timestamp), inventory);
 
     // Finally, mint the token and increment internal counters
     _mint(to, tokenId);
@@ -239,15 +263,15 @@ contract Furballs is ERC721Enumerable, Stakeholders {
   /// @notice Happens each time a furball changes wallets
   /// @dev Keeps track of the furball timestamp
   function _beforeTokenTransfer(
-      address from,
-      address to,
-      uint256 tokenId
+    address from,
+    address to,
+    uint256 tokenId
   ) internal override {
     super._beforeTokenTransfer(from, to, tokenId);
     furballs[tokenId].trade = uint64(block.timestamp);
     engine.onTrade(from, to, tokenId);
 
-    uint8 governanceAmount = expToLevel(furballs[tokenId].experience) + 1;
+    uint16 governanceAmount = computeLevel(furballs[tokenId].experience, engine.maxExperience()) + 1;
     governance.transferDelegates(from, to, governanceAmount, governanceAmount);
   }
 
@@ -260,44 +284,15 @@ contract Furballs is ERC721Enumerable, Stakeholders {
     FurLib.RewardModifiers memory mods = _rewardModifiers(tokenId, 0, 0);
 
     return FurLib.FurballStats(
-      _expFromExplore(tokenId, _interval, mods),
+      _expFromExplore(_interval, mods),
       _furFromBattle(tokenId, _interval, mods),
       mods,
       furballs[tokenId]
     );
   }
 
-  function expToLevel(uint32 exp) public pure returns(uint8) {
-    if (exp >= 2010000) return 200; // Max level
-
-    uint x = exp / 100;
-    if (x < 1) return 0;
-
-    // Calculate sqrt
-    x += (x - 1);
-    if (x <= 2) return 1;
-    else if (x <= 3) return 2;
-
-    uint z = (x + 1) / 2;
-    uint y = x;
-    while (z < y) {
-      y = z;
-      z = (x / z + z) / 2;
-    }
-    return uint8(y);
-    // uint32 expRequired = 0;
-    // exp /= 100;
-    // for (uint8 level = 1; level <= 200; level++) {
-    //   expRequired += uint32(level);
-    //   if (exp < expRequired) {
-    //     return level - 1;
-    //   }
-    // }
-    // return 200;
-  }
-
   function _expFromExplore(
-    uint256 tokenId, uint256 duration, FurLib.RewardModifiers memory mods
+    uint256 duration, FurLib.RewardModifiers memory mods
   ) internal view returns(uint32) {
     return uint32(_calculateReward(
       duration,
@@ -396,17 +391,22 @@ contract Furballs is ERC721Enumerable, Stakeholders {
   // Configuration / Admin
   // -----------------------------------------------------------------------------------------------
 
-  function init(address furAddress, address engineAddress, address gov, address edition) external onlyAdmin {
+  function init(address furAddress, address math, address engineAddress, address gov, address edition) external onlyAdmin {
     require(!_isReady(), 'RDY');
     fur = Fur(furAddress);
     governance = Governance(gov);
 
+    setMaths(math);
     setEngine(engineAddress);
     addEdition(edition, 0);
   }
 
   function setEngine(address addr) public onlyAdmin {
     engine = ILootEngine(addr);
+  }
+
+  function setMaths(address addr) public onlyAdmin {
+    maths = Maths(addr);
   }
 
   function addEdition(address addr, uint8 idx) public onlyAdmin {
@@ -421,7 +421,7 @@ contract Furballs is ERC721Enumerable, Stakeholders {
   }
 
   function _isReady() internal view returns(bool) {
-    return address(engine) != address(0) && editions.length > 0
+    return address(engine) != address(0) && editions.length > 0 && address(maths) != address(0)
       && address(fur) != address(0) && address(governance) != address(0);
   }
 

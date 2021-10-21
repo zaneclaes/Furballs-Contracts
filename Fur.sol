@@ -55,7 +55,6 @@ contract Fur is ERC20 {
     address owner = furballs.ownerOf(tokenId);
     modifiers.luckPercent += badLuck[owner];
 
-    uint32 add = 0;
     for (uint32 i=0; i<_snacks[tokenId].length && i <= FurLib.Max32; i++) {
       uint256 remaining = _snackTimeRemaning(_snacks[tokenId][i]);
       if (remaining > 0) {
@@ -137,7 +136,6 @@ contract Fur is ERC20 {
   /// @return The index+1 of the existing snack
   function _cleanSnack(uint256 tokenId, uint32 snackId) internal returns(uint256) {
     uint256 ret = 0;
-    uint32 happiness = 0;
     for (uint32 i=1; i<=_snacks[tokenId].length && i <= FurLib.Max32; i++) {
       FurLib.Snack memory snack = _snacks[tokenId][i-1];
       // Has the snack transitioned from active to inactive?

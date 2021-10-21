@@ -5,9 +5,9 @@ import "./FurLib.sol";
 
 /// @title Dice
 /// @author LFG Gaming LLC
-/// @notice Basic random number generation utility
-abstract contract Dice {
-  uint32 private LAST = 0;
+/// @notice Math utility functions that leverage storage and thus cannot be pure
+contract Maths {
+  uint32 private LAST = 0; // Re-seed for PRNG
 
   /// @notice A PRNG which re-seeds itself with block information & another PRNG
   /// @dev This is unit-tested with monobit (frequency) and longestRunOfOnes

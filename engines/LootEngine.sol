@@ -5,7 +5,6 @@ import "hardhat/console.sol";
 import "./ILootEngine.sol";
 import "../editions/IFurballEdition.sol";
 import "../Furballs.sol";
-import "../utils/Dice.sol";
 import "../utils/FurLib.sol";
 import "../utils/ProxyRegistry.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
@@ -13,7 +12,7 @@ import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 /// @title LootEngine
 /// @author LFG Gaming LLC
 /// @notice Base implementation of the loot engine
-abstract contract LootEngine is ERC165, ILootEngine, Dice {
+abstract contract LootEngine is ERC165, ILootEngine {
   Furballs public furballs;
 
   ProxyRegistry private _proxies;
@@ -23,9 +22,16 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     _proxies = ProxyRegistry(proxyRegistry);
   }
 
-  /// @notice Basic zoning check just ensures that there's at least one Furball.
-  function enterZone(uint256[] memory tokenIds, uint32 zone) external virtual override returns(uint256) {
-    require(tokenIds.length >= 1, 'TEAM');
+  /// @notice maxExperience is simply hardcoded for now.
+  function maxExperience() external virtual override view returns(uint32) {
+    return 2010000;
+  }
+
+  /// @notice Checking the zone may use _require to detect preconditions.
+  function enterZone(
+    uint256 tokenId, uint32 zone, uint256[] memory team
+  ) external virtual override returns(uint256) {
+    // Nothing to see here.
     return uint256(zone);
   }
 
@@ -61,7 +67,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
     require(rarity > 0 && rarity < 3, 'RARITY');
     uint32 threshold = FurLib.Max32 / 1000 * (1000 - (rarity == 1 ? 75 : 25));
-    if (roll(0) <= threshold) return 0;
+    if (furballs.maths().roll(0) <= threshold) return 0;
     return (stat * 256) + uint16(rarity + 1) * (256 ** 2);
   }
 
@@ -72,17 +78,17 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     // Only battles drop loot.
     if (FurLib.isBattleZone(mods.zone)) return 0;
 
-    uint256 mult = uint256(mods.luckPercent);
-    uint8 rarity = rollRarity(uint32(intervals * mult / FurLib.OneHundredPercent), 0);
+    uint8 rarity = rollRarity(
+      uint32(intervals * uint256(mods.luckPercent) / FurLib.OneHundredPercent), 0);
     if (rarity == 0) return 0;
-    uint8 stat = uint8(roll(0) % 2);
+    uint8 stat = uint8(furballs.maths().roll(0) % 2);
     return (stat * 256) + uint16(rarity) * (256 ** 2);
   }
 
   /// @notice Core loot drop rarity randomization
   function rollRarity(uint32 chance, uint32 seed) public returns(uint8) {
     uint32 threshold = 4320;
-    uint32 rolled = roll(seed) % threshold;
+    uint32 rolled = furballs.maths().roll(seed) % threshold;
 
     if (chance > threshold || rolled >= (threshold - chance)) return 3;
     threshold -= chance;

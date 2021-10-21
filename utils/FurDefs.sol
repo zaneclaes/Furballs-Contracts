@@ -8,7 +8,7 @@ import "./FurLib.sol";
 /// @notice Public utility library around game-specific equations and constants
 library FurDefs {
   function baseModifiers(
-    uint8 level, uint256 rarityPoints, uint32 zone
+    uint16 level, uint256 rarityPoints, uint32 zone
   ) internal pure returns(FurLib.RewardModifiers memory) {
     uint256 rarityBoost = rarityPoints * FurLib.OnePercent;
     return FurLib.RewardModifiers(

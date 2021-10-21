@@ -3,7 +3,6 @@ pragma solidity ^0.8.6;
 
 import "./IFurballEdition.sol";
 import "../Furballs.sol";
-import "../utils/Dice.sol";
 import "../utils/FurLib.sol";
 import "../utils/FurDefs.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
@@ -15,7 +14,7 @@ import "hardhat/console.sol";
 /// @title FurballEdition
 /// @author LFG Gaming LLC
 /// @notice Base class for a furball edition with common implementations
-abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
+abstract contract FurballEdition is ERC165, IFurballEdition {
   // Is this edition live?
   bool public override live = false;
 
@@ -41,7 +40,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   Furballs public furballs;
 
   function getRewardModifiers(
-    uint256 tokenId, uint8 level, uint32 zone
+    uint256 tokenId, uint16 level, uint32 zone
   ) external override virtual view returns(FurLib.RewardModifiers memory) {
     return FurDefs.baseModifiers(level, _getRarityBoostPoints(tokenId), zone);
   }
@@ -148,8 +147,8 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   }
 
   function spawn() external override returns (uint256) {
-    uint8 palette = uint8(roll(0) % _palette.numPalettes());
-    uint8 bk = uint8(roll(0) % _palette.numBackgroundColors());
+    uint8 palette = uint8(furballs.maths().roll(0) % _palette.numPalettes());
+    uint8 bk = uint8(furballs.maths().roll(0) % _palette.numBackgroundColors());
     uint256 ret = (bk * (256 ** 2)) + (palette * 256);
     for (uint8 slot=0; slot<slots.length; slot++) {
       ret += _rollSlot(slot) * (256 ** (slot + 3));
@@ -162,7 +161,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   }
 
   function rollRarity(uint32 seed) public returns(uint8) {
-    uint32 rolled = roll(seed);
+    uint32 rolled = furballs.maths().roll(seed);
     uint32[4] memory rarities = [
       FurLib.Max32 / 1000 * 738, // 20%
       FurLib.Max32 / 1000 * 938, // 5%
@@ -188,7 +187,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
       // This is a null slot.
       return 0;
     }
-    return (roll(0) % opts.length) + 1;
+    return (furballs.maths().roll(0) % opts.length) + 1;
   }
 
   /// @notice Rarity is in points (i.e., 1%s)

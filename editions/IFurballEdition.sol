@@ -25,7 +25,7 @@ interface IFurballEdition is IERC165 {
   function spawn() external returns (uint256);
 
   /// @notice Calculates the effects of the loot in a Furball's inventory
-  function getRewardModifiers(uint256 tokenId, uint8 level, uint32 zone) external view returns(FurLib.RewardModifiers memory);
+  function getRewardModifiers(uint256 tokenId, uint16 level, uint32 zone) external view returns(FurLib.RewardModifiers memory);
 
   function tokenData(uint256 tokenId, uint256 number, uint64 birth, bytes memory attributes) external view returns(bytes memory);
 }
