@@ -16,7 +16,11 @@ interface ILootEngine is IERC165 {
   function dropLoot(uint32 intervals, FurLib.RewardModifiers memory mods) external returns(uint256);
 
   /// @notice Players can pay to re-roll their loot drop on a Furball
-  function upgradeLoot(uint256 item, uint32 badLuck) external returns(uint256);
+  function upgradeLoot(
+    address owner,
+    uint256 item,
+    FurLib.RewardModifiers memory modifiers
+  ) external returns(uint256);
 
   /// @notice Some zones may have preconditions
   function enterZone(uint256 tokenId, uint32 zone, uint256[] memory team) external returns(uint256);

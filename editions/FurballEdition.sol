@@ -16,8 +16,8 @@ import "./IFurballPalette.sol";
 /// @author LFG Gaming LLC
 /// @notice Base class for a furball edition with common implementations
 abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
-  // Is this edition live?
-  bool public override live = false;
+  // The time at which this edition goes live
+  uint64 public override liveAt = 0;
 
   // How many exist in this edition?
   uint32 public override count = 0;
@@ -122,9 +122,8 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     return _parts[slots[slot]].count();
   }
 
-  function setLive(bool goLive) public onlyAdmin {
-    require(live != goLive, 'LIVE');
-    live = goLive;
+  function setLiveAt(uint64 at) public onlyAdmin {
+    liveAt = at;
   }
 
   function addToWhitelist(address[] memory addresses, uint32 num) public onlyAdmin {

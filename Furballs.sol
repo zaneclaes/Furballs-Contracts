@@ -116,7 +116,8 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   /// @param slot The slot in its inventory to re-roll
   function upgrade(uint256 tokenId, uint32 slot) external {
     // Attempt upgrade (random chance).
-    uint256 upgrade = fur.purchaseUpgrade(_approvedSender(), tokenId, slot);
+    uint256 upgrade = fur.purchaseUpgrade(
+      _approvedSender(), tokenId, slot, _rewardModifiers(tokenId, 0, 0));
     if (upgrade != 0) {
       furballs[tokenId].inventory[slot] = upgrade;
     }

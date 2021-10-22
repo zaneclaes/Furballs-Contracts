@@ -20,7 +20,7 @@ contract Edition1 is FurballEdition {
     if (furballs.isAdmin(addr)) {
       return withFur ? 75 : 50;
     }
-    if (!live) {
+    if (liveAt == 0 || liveAt > uint64(block.timestamp)) {
       return _whitelist[addr];
     }
     return withFur ? 15 : 5;

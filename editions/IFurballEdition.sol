@@ -15,7 +15,7 @@ interface IFurballEdition is IERC165 {
   function numSlots() external view returns(uint8);
   function numParts(uint8 slot) external view returns(uint8);
 
-  function live() external view returns(bool);
+  function liveAt() external view returns(uint64);
   function minted(address addr) external view returns(uint32);
   function maxMintable(address addr) external view returns(uint32);
 

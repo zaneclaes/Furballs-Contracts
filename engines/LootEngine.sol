@@ -61,26 +61,30 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   ) external virtual override onlyFurballs { }
 
   /// @notice Attempt to upgrade a given piece of loot (item ID)
-  function upgradeLoot(uint256 item, uint32 badLuck) external virtual override returns(uint256) {
+  function upgradeLoot(
+    address owner, uint256 item, FurLib.RewardModifiers memory modifiers
+  ) external virtual override returns(uint256) {
     uint8 rarity = itemRarity(item);
     uint8 stat = itemStat(item);
 
     require(rarity > 0 && rarity < 3, 'RARITY');
     uint32 threshold = FurLib.Max32 / 1000 * (1000 - (rarity == 1 ? 75 : 25));
-    if (roll(0) <= threshold) return 0;
+    uint256 rolled = uint256(roll(0)) * uint256(modifiers.luckPercent) / FurLib.OneHundredPercent;
+
+    if (rolled <= threshold) return 0;
     return (stat * 256) + uint16(rarity + 1) * (256 ** 2);
   }
 
-  /// @notice Main loot-drop function
+  /// @notice Main loot-drop functionm
   function dropLoot(
-    uint32 intervals, FurLib.RewardModifiers memory mods
+    uint32 intervals, FurLib.RewardModifiers memory modifiers
   ) external virtual override onlyFurballs returns(uint256) {
     // Only battles drop loot.
-    if (FurLib.isBattleZone(mods.zone)) return 0;
-    if (mods.weight >= 50) return 0;
+    if (FurLib.isBattleZone(modifiers.zone)) return 0;
+    if (modifiers.weight >= 50) return 0;
 
     uint8 rarity = rollRarity(
-      uint32(intervals * uint256(mods.luckPercent) / FurLib.OneHundredPercent), 0);
+      uint32(intervals * uint256(modifiers.luckPercent) / FurLib.OneHundredPercent), 0);
     if (rarity == 0) return 0;
     uint8 stat = uint8(roll(0) % 2);
     return (stat * 256) + uint16(rarity) * (256 ** 2);
