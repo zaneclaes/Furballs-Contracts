@@ -8,8 +8,8 @@ import "./editions/IFurballEdition.sol";
 import "./engines/ILootEngine.sol";
 import "./engines/EngineA.sol";
 import "./utils/FurLib.sol";
+import "./utils/FurDefs.sol";
 import "./utils/Stakeholders.sol";
-import "./utils/Maths.sol";
 import "./utils/Governance.sol";
 import "./utils/Exp.sol";
 import "./Fur.sol";
@@ -27,8 +27,6 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
 
   Governance public governance;
 
-  Maths public maths;
-
   // tokenId => furball data
   mapping(uint256 => FurLib.Furball) public furballs;
 
@@ -36,8 +34,8 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   uint256 private _interval;
 
   event Spawn(uint256 tokenId, address addr, uint8 editionIndex, uint32 editionCount);
-  event Play(uint256 tokenId, uint256 furBalance, FurLib.FurballStats);
-  event Pickup(uint256 tokenId, uint32 slot, uint256 loot, FurLib.FurballStats);
+  event Play(uint256 tokenId, uint256 furBalance);
+  event Pickup(uint256 tokenId, uint32 slot, uint256 loot);
   event Drop(uint256 tokenId, uint32 slot, uint256 loot);
   event Upgrade(uint256 tokenId, uint32 slot, uint256 old, uint256 upgrade);
 
@@ -110,7 +108,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     furballs[tokenId].zone = zone;
 
     // Emit state
-    emit Play(tokenId, fur.balanceOf(owner), stats(tokenId));
+    emit Play(tokenId, fur.balanceOf(owner));
   }
 
   /// @notice Re-dropping loot allows players to pay $FUR to re-roll an inventory slot
@@ -129,14 +127,17 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
 
   /// @notice The LootEngine can directly send loot to a furball!
   /// @dev This allows for gameplay expansion, i.e., new game modes
-  /// @param tokenId The furball
+  /// @param tokenIds The furball to gain the loot
   /// @param loot The loot ID being sent
-  function pickup(uint256 tokenId, uint256 loot) external {
+  function pickup(uint256[] memory tokenIds, uint256 loot) external {
     require(msg.sender == address(engine) || isAdmin(msg.sender), 'ENG');
-    require(_exists(tokenId));
-    uint32 slot = uint32(furballs[tokenId].inventory.length);
-    furballs[tokenId].inventory.push(loot);
-    emit Pickup(tokenId, slot, loot, stats(tokenId));
+    for (uint256 i=0; i<tokenIds.length; i++) {
+      uint256 tokenId = tokenIds[i];
+      require(_exists(tokenId));
+      uint32 slot = uint32(furballs[tokenId].inventory.length);
+      furballs[tokenId].inventory.push(loot);
+      emit Pickup(tokenId, slot, loot);
+    }
   }
 
   /// @notice The LootEngine can cause a furball to drop loot!
@@ -164,18 +165,27 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   function _rewardModifiers(
     uint256 tokenId, uint32 zone, uint32 teamSize
   ) internal view returns(FurLib.RewardModifiers memory) {
-    return engine.getRewardModifiers(
-      fur.getRewardModifiers(
-        tokenId,
-        editions[tokenId % 256].getRewardModifiers(
-          tokenId,
-          expToLevel(furballs[tokenId].experience, engine.maxExperience()),
-          zone
-        )
-      ),
-      teamSize,
-      furballs[tokenId].inventory
+    // Create the base modifiers based upon current level, rarity, and zone.
+    uint256 rarityBoost =  furballs[tokenId].rarity * FurLib.OnePercent;
+    FurLib.RewardModifiers memory reward = FurLib.RewardModifiers(
+      uint32(FurLib.OneHundredPercent + rarityBoost),
+      uint32(FurLib.OneHundredPercent + rarityBoost),
+      uint32(FurLib.OneHundredPercent + rarityBoost),
+      0, // Baseline zero happiness
+      0, // Baseline zero energy
+      zone,
+      0, // Zero weight
+      expToLevel(furballs[tokenId].experience, engine.maxExperience())
     );
+
+    // Allow the edition to modify the reward for special zone-based strengths
+    reward = editions[tokenId % 256].modifyReward(tokenId, reward);
+
+    // FUR will apply snacks and luck (happiness, energy, luck)
+    reward = fur.modifyReward(tokenId, reward);
+
+    // Engine will consider inventory and team size in zone
+    return engine.modifyReward(reward, teamSize, furballs[tokenId].inventory);
   }
 
   /// @notice Ends the current explore/battle and dispenses rewards
@@ -216,7 +226,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     if (fur.handleLuck(loot > 0, owner)) {
       uint32 slot = uint32(furballs[tokenId].inventory.length);
       furballs[tokenId].inventory.push(loot);
-      emit Pickup(tokenId, slot, loot, stats(tokenId));
+      emit Pickup(tokenId, slot, loot);
     }
 
     // Clean the snacks as part of the transaction for good housekeeping
@@ -233,30 +243,33 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     require(nonce < 10, "SUPPLY");
     require(editionIndex < editions.length, "ED");
 
+    IFurballEdition edition = editions[editionIndex];
+
     // Generate a random furball tokenId; if it fails to be unique, recurse!
-    uint256 tokenId = editions[editionIndex].spawn() + editionIndex;
+    (uint256 tokenId, uint32 rarity) = edition.spawn();
+    tokenId += editionIndex;
     if (_exists(tokenId)) return _spawn(to, editionIndex, nonce + 1);
 
     // Ensure that this wallet has not exceeded its per-edition mint-cap
-    uint32 owned = editions[editionIndex].minted(to);
-    uint32 limit = editions[editionIndex].maxMintable(to);
+    uint32 owned = edition.minted(to);
+    uint32 limit = edition.maxMintable(to);
     require(owned < limit, "LIMIT");
 
     // Check the current edition's constraints (caller should have checked costs)
-    uint32 cnt = editions[editionIndex].count();
-    uint32 max = editions[editionIndex].maxCount();
+    uint32 cnt = edition.count();
+    uint32 max = edition.maxCount();
     require(cnt < max, "MAX");
 
     // Create the memory struct that represens the furball
     uint256[] memory inventory;
     furballs[tokenId] = FurLib.Furball(
-      totalSupply() + 1, cnt, 0, 0,
+      totalSupply() + 1, cnt, rarity, 0, 0,
       uint64(block.timestamp), uint64(block.timestamp), uint64(block.timestamp), inventory);
 
     // Finally, mint the token and increment internal counters
     _mint(to, tokenId);
 
-    editions[editionIndex].addCount(to, 1);
+    edition.addCount(to, 1);
     emit Spawn(tokenId, to, editionIndex, cnt + 1);
   }
 
@@ -391,22 +404,17 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   // Configuration / Admin
   // -----------------------------------------------------------------------------------------------
 
-  function init(address furAddress, address math, address engineAddress, address gov, address edition) external onlyAdmin {
+  function init(address furAddress, address engineAddress, address gov, address edition) external onlyAdmin {
     require(!_isReady(), 'RDY');
     fur = Fur(furAddress);
     governance = Governance(gov);
 
-    setMaths(math);
     setEngine(engineAddress);
     addEdition(edition, 0);
   }
 
   function setEngine(address addr) public onlyAdmin {
     engine = ILootEngine(addr);
-  }
-
-  function setMaths(address addr) public onlyAdmin {
-    maths = Maths(addr);
   }
 
   function addEdition(address addr, uint8 idx) public onlyAdmin {
@@ -421,7 +429,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   }
 
   function _isReady() internal view returns(bool) {
-    return address(engine) != address(0) && editions.length > 0 && address(maths) != address(0)
+    return address(engine) != address(0) && editions.length > 0
       && address(fur) != address(0) && address(governance) != address(0);
   }
 

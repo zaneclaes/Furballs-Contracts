@@ -17,6 +17,7 @@ library FurLib {
   struct Furball {
     uint256 number;       // Overall number, starting with 1
     uint32 count;         // Index within the collection
+    uint32 rarity;        // Total rarity score for later boosts
     uint32 experience;    // EXP
     uint32 zone;          // When exploring, the zone number. Otherwise, battling.
     uint64 last;          // Timestamp of last action (battle/explore)
@@ -33,6 +34,7 @@ library FurLib {
     uint32 happinessPoints;
     uint32 energyPoints;
     uint32 zone;
+    uint16 weight;        // Inventory size
     uint16 level;         // Current EXP => level
   }
 

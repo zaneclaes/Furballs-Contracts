@@ -22,7 +22,7 @@ interface ILootEngine is IERC165 {
   function enterZone(uint256 tokenId, uint32 zone, uint256[] memory team) external returns(uint256);
 
   /// @notice Calculates the effects of the loot in a Furball's inventory
-  function getRewardModifiers(
+  function modifyReward(
     FurLib.RewardModifiers memory baseModifiers,
     uint32 teamSize,
     uint256[] memory inventory

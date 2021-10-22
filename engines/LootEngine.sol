@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.6;
 
-import "hardhat/console.sol";
 import "./ILootEngine.sol";
 import "../editions/IFurballEdition.sol";
 import "../Furballs.sol";
 import "../utils/FurLib.sol";
 import "../utils/ProxyRegistry.sol";
+import "../utils/Dice.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
 /// @title LootEngine
 /// @author LFG Gaming LLC
 /// @notice Base implementation of the loot engine
-abstract contract LootEngine is ERC165, ILootEngine {
+abstract contract LootEngine is ERC165, ILootEngine, Dice {
   Furballs public furballs;
 
   ProxyRegistry private _proxies;
@@ -67,7 +67,7 @@ abstract contract LootEngine is ERC165, ILootEngine {
 
     require(rarity > 0 && rarity < 3, 'RARITY');
     uint32 threshold = FurLib.Max32 / 1000 * (1000 - (rarity == 1 ? 75 : 25));
-    if (furballs.maths().roll(0) <= threshold) return 0;
+    if (roll(0) <= threshold) return 0;
     return (stat * 256) + uint16(rarity + 1) * (256 ** 2);
   }
 
@@ -77,18 +77,19 @@ abstract contract LootEngine is ERC165, ILootEngine {
   ) external virtual override onlyFurballs returns(uint256) {
     // Only battles drop loot.
     if (FurLib.isBattleZone(mods.zone)) return 0;
+    if (mods.weight >= 50) return 0;
 
     uint8 rarity = rollRarity(
       uint32(intervals * uint256(mods.luckPercent) / FurLib.OneHundredPercent), 0);
     if (rarity == 0) return 0;
-    uint8 stat = uint8(furballs.maths().roll(0) % 2);
+    uint8 stat = uint8(roll(0) % 2);
     return (stat * 256) + uint16(rarity) * (256 ** 2);
   }
 
   /// @notice Core loot drop rarity randomization
   function rollRarity(uint32 chance, uint32 seed) public returns(uint8) {
     uint32 threshold = 4320;
-    uint32 rolled = furballs.maths().roll(seed) % threshold;
+    uint32 rolled = roll(seed) % threshold;
 
     if (chance > threshold || rolled >= (threshold - chance)) return 3;
     threshold -= chance;
@@ -120,16 +121,17 @@ abstract contract LootEngine is ERC165, ILootEngine {
     return snack;
   }
 
-  function getRewardModifiers(
+  function modifyReward(
     FurLib.RewardModifiers memory modifiers,
     uint32 teamSize,
     uint256[] memory inventory
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Raw/base stats
     modifiers.furPercent += uint32(FurLib.OnePercent * modifiers.level * 2);
+    modifiers.weight = uint16(inventory.length);
 
     // First add in the inventory
-    for (uint256 i=0; i<inventory.length; i++) {
+    for (uint256 i=0; i<modifiers.weight; i++) {
       uint32 boost = uint32(itemRarity(inventory[i]) * 5 * FurLib.OnePercent);
       if (itemStat(inventory[i]) == 0) {
         modifiers.expPercent += boost;

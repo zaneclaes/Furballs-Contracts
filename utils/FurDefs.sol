@@ -7,21 +7,6 @@ import "./FurLib.sol";
 /// @author LFG Gaming LLC
 /// @notice Public utility library around game-specific equations and constants
 library FurDefs {
-  function baseModifiers(
-    uint16 level, uint256 rarityPoints, uint32 zone
-  ) internal pure returns(FurLib.RewardModifiers memory) {
-    uint256 rarityBoost = rarityPoints * FurLib.OnePercent;
-    return FurLib.RewardModifiers(
-      uint32(FurLib.OneHundredPercent + rarityBoost),
-      uint32(FurLib.OneHundredPercent + rarityBoost),
-      uint32(FurLib.OneHundredPercent + rarityBoost),
-      0, // Baseline zero happiness
-      0, // Baseline zero energy
-      zone,
-      level
-    );
-  }
-
   function rarityName(uint8 rarity) internal pure returns(string memory) {
     if (rarity == 0) return "Common";
     if (rarity == 1) return "Elite";

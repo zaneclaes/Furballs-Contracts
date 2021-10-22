@@ -48,7 +48,7 @@ contract Fur is ERC20 {
   }
 
   /// @notice The public accessor calculates the snack boosts
-  function getRewardModifiers(
+  function modifyReward(
     uint256 tokenId, FurLib.RewardModifiers memory modifiers
   ) external view returns(FurLib.RewardModifiers memory) {
     // Add to base luck percent stat with the bad luck of the owner
@@ -62,6 +62,7 @@ contract Fur is ERC20 {
         modifiers.energyPoints += _snacks[tokenId][i].energy;
       }
     }
+
     return modifiers;
   }
 
@@ -183,7 +184,7 @@ contract Fur is ERC20 {
       badLuck[to] = 0;
     } else if(badLuck[to] < FurLib.OneHundredPercent) {
       // Bad luck caps out at 100% max
-      badLuck[to] += uint32(FurLib.OnePercent);
+      badLuck[to] += uint32(5 * FurLib.OnePercent);
     }
     return goodLuck;
   }

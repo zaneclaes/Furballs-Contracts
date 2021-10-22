@@ -6,7 +6,7 @@ import "./FurLib.sol";
 /// @title Dice
 /// @author LFG Gaming LLC
 /// @notice Math utility functions that leverage storage and thus cannot be pure
-contract Maths {
+abstract contract Dice {
   uint32 private LAST = 0; // Re-seed for PRNG
 
   /// @notice A PRNG which re-seeds itself with block information & another PRNG

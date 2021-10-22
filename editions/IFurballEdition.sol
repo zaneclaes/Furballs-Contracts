@@ -22,10 +22,12 @@ interface IFurballEdition is IERC165 {
   function purchaseFur() external view returns(uint256); // amount of fur to buy
   function maxAdoptable() external view returns (uint32); // how many can be adopted, out of the max?
 
-  function spawn() external returns (uint256);
+  function spawn() external returns (uint256, uint32);
 
   /// @notice Calculates the effects of the loot in a Furball's inventory
-  function getRewardModifiers(uint256 tokenId, uint16 level, uint32 zone) external view returns(FurLib.RewardModifiers memory);
+  function modifyReward(
+    uint256 tokenId, FurLib.RewardModifiers memory modifiers
+  ) external view returns(FurLib.RewardModifiers memory);
 
   function tokenData(uint256 tokenId, uint256 number, uint64 birth, bytes memory attributes) external view returns(bytes memory);
 }

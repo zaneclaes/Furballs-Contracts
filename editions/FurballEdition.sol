@@ -5,16 +5,17 @@ import "./IFurballEdition.sol";
 import "../Furballs.sol";
 import "../utils/FurLib.sol";
 import "../utils/FurDefs.sol";
+import "../utils/Dice.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import "./IFurballPart.sol";
 import "./IFurballPaths.sol";
 import "./IFurballPalette.sol";
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 /// @title FurballEdition
 /// @author LFG Gaming LLC
 /// @notice Base class for a furball edition with common implementations
-abstract contract FurballEdition is ERC165, IFurballEdition {
+abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   // Is this edition live?
   bool public override live = false;
 
@@ -37,12 +38,19 @@ abstract contract FurballEdition is ERC165, IFurballEdition {
 
   IFurballPaths[] private _paths;
 
+  uint32[4] private rarities = [
+    FurLib.Max32 / 1000 * 738, // 20%
+    FurLib.Max32 / 1000 * 938, // 5%
+    FurLib.Max32 / 1000 * 988, // 1%
+    FurLib.Max32 / 1000 * 998  // 0.2%
+  ];
+
   Furballs public furballs;
 
-  function getRewardModifiers(
-    uint256 tokenId, uint16 level, uint32 zone
+  function modifyReward(
+    uint256 tokenId, FurLib.RewardModifiers memory modifiers
   ) external override virtual view returns(FurLib.RewardModifiers memory) {
-    return FurDefs.baseModifiers(level, _getRarityBoostPoints(tokenId), zone);
+    return modifiers;
   }
 
   constructor(
@@ -126,7 +134,6 @@ abstract contract FurballEdition is ERC165, IFurballEdition {
   }
 
   function _getAttributes(uint256 tokenId) internal virtual view returns (string memory) {
-    uint32 boost = _getRarityBoostPoints(tokenId);
     bytes memory ret = "";
     // abi.encodePacked(
     //     '{"display_type": "boost_percentage", "trait_type": "Rarity", "value": ',
@@ -146,14 +153,17 @@ abstract contract FurballEdition is ERC165, IFurballEdition {
     return string(ret);
   }
 
-  function spawn() external override returns (uint256) {
-    uint8 palette = uint8(furballs.maths().roll(0) % _palette.numPalettes());
-    uint8 bk = uint8(furballs.maths().roll(0) % _palette.numBackgroundColors());
-    uint256 ret = (bk * (256 ** 2)) + (palette * 256);
+  function spawn() external override returns (uint256, uint32) {
+    uint8 palette = uint8(roll(0) % _palette.numPalettes());
+    uint8 bk = uint8(roll(0) % _palette.numBackgroundColors());
+    uint256 tokenId = (bk * (256 ** 2)) + (palette * 256);
+    uint32 boost = 0;
     for (uint8 slot=0; slot<slots.length; slot++) {
-      ret += _rollSlot(slot) * (256 ** (slot + 3));
+      (uint256 id, uint8 rarity) = rollSlot(0, slot, 0);
+      tokenId += id * (256 ** (slot + 3));
+      boost += uint32(rarity * 5);
     }
-    return ret;
+    return (tokenId, boost);
   }
 
   function _extractSlotNumber(uint256 tokenId, uint8 slot) internal pure returns(uint8) {
@@ -161,13 +171,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition {
   }
 
   function rollRarity(uint32 seed) public returns(uint8) {
-    uint32 rolled = furballs.maths().roll(seed);
-    uint32[4] memory rarities = [
-      FurLib.Max32 / 1000 * 738, // 20%
-      FurLib.Max32 / 1000 * 938, // 5%
-      FurLib.Max32 / 1000 * 988, // 1%
-      FurLib.Max32 / 1000 * 998  // 0.2%
-    ];
+    uint32 rolled = roll(seed);
     for (uint8 r=4; r>0; r--) {
       if (rolled > rarities[r - 1]) {
         return r;
@@ -176,30 +180,18 @@ abstract contract FurballEdition is ERC165, IFurballEdition {
     return 0;
   }
 
-  function _rollSlot(uint8 i) internal returns(uint256) {
-    uint8 rarity = rollRarity(0);
+  function rollSlot(uint32 seed, uint8 i, uint8 rarity) public returns(uint256, uint8) {
+    rarity = rarity > 0 ? rarity : rollRarity(seed);
     uint8[] memory opts = _parts[slots[uint(i)]].options(rarity);
     if (opts.length == 0) {
-      if (rarity != 0) {
+      if (rarity > 1) {
         // Rolled a rare attribute, but there were no options. Re-try this roll.
-        return _rollSlot(i);
+        return rollSlot(seed, i, rarity - 1);
       }
       // This is a null slot.
-      return 0;
+      return (0, 0);
     }
-    return (furballs.maths().roll(0) % opts.length) + 1;
-  }
-
-  /// @notice Rarity is in points (i.e., 1%s)
-  function _getRarityBoostPoints(uint256 tokenId) internal virtual view returns (uint32) {
-    uint32 boost = 0;
-    for (uint8 slot=0; slot<slots.length; slot++) {
-      uint8 idx = _extractSlotNumber(tokenId, slot);
-      if (idx == 0) continue;
-      idx--;
-      boost += uint32(_getRarity(slot, idx) * 5);
-    }
-    return boost;
+    return (opts[roll(seed) % opts.length] + 1, rarity);
   }
 
   function _getRarity(uint8 slot, uint8 idx) internal virtual view returns(uint8) {
