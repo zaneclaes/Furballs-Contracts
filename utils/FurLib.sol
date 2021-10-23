@@ -11,6 +11,16 @@ library FurLib {
     uint32 furRate;
     RewardModifiers modifiers;
     Furball definition;
+    Snack[] snacks;
+  }
+
+  // The response from a single play session indicating rewards
+  struct Rewards {
+    uint64 duration;
+    uint16 levels;
+    uint32 experience;
+    uint128 loot;
+    uint256 fur;
   }
 
   // Stored data structure in Furballs master contract which keeps track of mutable data
@@ -20,10 +30,11 @@ library FurLib {
     uint32 rarity;        // Total rarity score for later boosts
     uint32 experience;    // EXP
     uint32 zone;          // When exploring, the zone number. Otherwise, battling.
+    uint16 level;         // Current EXP => level; can change based on level up during collect
     uint64 last;          // Timestamp of last action (battle/explore)
     uint64 birth;         // Timestamp of furball creation
     uint64 trade;         // Timestamp of last furball trading wallets
-    uint256[] inventory;  // Infinite size; see ILootEngine
+    uint256[] inventory;  // IDs of items in inventory
   }
 
   // A runtime-calculated set of properties that can affect Furball production during collect()
@@ -35,7 +46,7 @@ library FurLib {
     uint32 energyPoints;
     uint32 zone;
     uint16 weight;        // Inventory size
-    uint16 level;         // Current EXP => level
+    uint16 level;         // Starting level (at beginning of collection cycle)
   }
 
   // For sale via loot engine.

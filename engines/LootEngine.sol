@@ -62,10 +62,12 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
   /// @notice Attempt to upgrade a given piece of loot (item ID)
   function upgradeLoot(
-    address owner, uint256 item, FurLib.RewardModifiers memory modifiers
-  ) external virtual override returns(uint256) {
-    uint8 rarity = itemRarity(item);
-    uint8 stat = itemStat(item);
+    address owner,
+    uint128 lootId,
+    FurLib.RewardModifiers memory modifiers
+  ) external virtual override returns(uint128) {
+    uint8 rarity = itemRarity(lootId);
+    uint8 stat = itemStat(lootId);
 
     require(rarity > 0 && rarity < 3, 'RARITY');
     uint32 threshold = FurLib.Max32 / 1000 * (1000 - (rarity == 1 ? 75 : 25));
@@ -77,8 +79,9 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
   /// @notice Main loot-drop functionm
   function dropLoot(
-    uint32 intervals, FurLib.RewardModifiers memory modifiers
-  ) external virtual override onlyFurballs returns(uint256) {
+    uint32 intervals,
+    FurLib.RewardModifiers memory modifiers
+  ) external virtual override onlyFurballs returns(uint128) {
     // Only battles drop loot.
     if (FurLib.isBattleZone(modifiers.zone)) return 0;
     if (modifiers.weight >= 50) return 0;
@@ -86,13 +89,17 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     uint8 rarity = rollRarity(
       uint32(intervals * uint256(modifiers.luckPercent) / FurLib.OneHundredPercent), 0);
     if (rarity == 0) return 0;
-    uint8 stat = uint8(roll(modifiers.expPercent) % 2);
-    return (stat * 256) + uint16(rarity) * (256 ** 2);
+    uint8 stat = uint8(roll(0) % 2);
+    return (uint16(rarity) * (256 ** 2)) + (stat * 256);
   }
 
   /// @notice Core loot drop rarity randomization
   function rollRarity(uint32 chance, uint32 seed) public returns(uint8) {
     uint32 threshold = 4320;
+    if (chance > threshold) {
+      // When the chance given is higher than the highest rarity, just give the highest.
+      return 3;
+    }
     uint32 rolled = roll(seed) % threshold;
 
     if (chance > threshold || rolled >= (threshold - chance)) return 3;
@@ -135,8 +142,10 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
     // First add in the inventory
     for (uint256 i=0; i<modifiers.weight; i++) {
-      uint32 boost = uint32(itemRarity(inventory[i]) * 5 * FurLib.OnePercent);
-      if (itemStat(inventory[i]) == 0) {
+      uint128 lootId = uint128(inventory[i] / 256);
+      uint32 stackSize = uint32(inventory[i] % 256);
+      uint32 boost = uint32(itemRarity(lootId) * stackSize * 5 * FurLib.OnePercent);
+      if (itemStat(lootId) == 0) {
         modifiers.expPercent += boost;
       } else {
         modifiers.furPercent += boost;
@@ -180,12 +189,12 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   //     trait, '", "value": ', FurLib.uint2str(((points > 100) ? (points - 100) : 0)), '},');
   // }
 
-  function itemRarity(uint256 item) public pure returns(uint8) {
-    return FurLib.extractByte(item, 1);
+  function itemRarity(uint128 lootId) public pure returns(uint8) {
+    return FurLib.extractByte(lootId, 1);
   }
 
-  function itemStat(uint256 item) public pure returns(uint8) {
-    return FurLib.extractByte(item, 2);
+  function itemStat(uint128 lootId) public pure returns(uint8) {
+    return FurLib.extractByte(lootId, 2);
   }
 
   function _expBoosterName(uint8 rarity) internal pure returns(string memory) {

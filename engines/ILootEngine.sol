@@ -13,14 +13,14 @@ interface ILootEngine is IERC165 {
   function maxExperience() external view returns(uint32);
 
   /// @notice When a Furball comes back from exploration, potentially give it some loot.
-  function dropLoot(uint32 intervals, FurLib.RewardModifiers memory mods) external returns(uint256);
+  function dropLoot(uint32 intervals, FurLib.RewardModifiers memory mods) external returns(uint128);
 
   /// @notice Players can pay to re-roll their loot drop on a Furball
   function upgradeLoot(
     address owner,
-    uint256 item,
+    uint128 lootId,
     FurLib.RewardModifiers memory modifiers
-  ) external returns(uint256);
+  ) external returns(uint128);
 
   /// @notice Some zones may have preconditions
   function enterZone(uint256 tokenId, uint32 zone, uint256[] memory team) external returns(uint256);

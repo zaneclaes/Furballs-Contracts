@@ -94,17 +94,14 @@ contract Fur is ERC20 {
   /// @notice Attempts to purchase an upgrade for a loot item
   /// @dev Delegated logic from Furballs
   function purchaseUpgrade(
-    address from, uint256 tokenId, uint32 slot, FurLib.RewardModifiers memory modifiers
-  ) external onlyGame returns(uint256) {
+    address from, uint256 tokenId, uint128 lootId, FurLib.RewardModifiers memory modifiers
+  ) external onlyGame returns(uint128) {
     address owner = furballs.ownerOf(tokenId);
-    require(furballs.inventory(tokenId).length > slot, "SLOT");
-
-    uint256 itemId = furballs.inventory(tokenId)[slot];
 
     // _gift will throw if cannot gift or cannot afford cost
     _gift(from, owner, 1000);
 
-    uint256 upgrade = furballs.engine().upgradeLoot(owner, itemId, modifiers);
+    uint128 upgrade = furballs.engine().upgradeLoot(owner, lootId, modifiers);
     _handleLuck(upgrade != 0, owner);
 
     return upgrade;
