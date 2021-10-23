@@ -113,15 +113,17 @@ contract Fur is ERC20 {
   /// @notice Attempts to purchase a snack using templates found in the engine
   /// @dev Delegated logic from Furballs
   function purchaseSnack(
-    address from, uint256 tokenId, FurLib.Snack memory snack
+    address from, uint256 tokenId, uint32 snackId, uint16 count
   ) external onlyGame {
+    FurLib.Snack memory snack = furballs.engine().getSnack(snackId);
     require(snack.count > 0, 'COUNT');
     require(snack.fed == 0, 'FED');
 
     // _gift will throw if cannot gift or cannot afford costQ
-    _gift(from, furballs.ownerOf(tokenId), snack.furCost);
+    _gift(from, furballs.ownerOf(tokenId), snack.furCost * count);
 
     uint256 existingSnackNumber = _cleanSnack(tokenId, snack.snackId);
+    snack.count *= count;
     if (existingSnackNumber > 0) {
       // Adding count effectively adds duration to the active snack
       _snacks[tokenId][existingSnackNumber - 1].count += snack.count;

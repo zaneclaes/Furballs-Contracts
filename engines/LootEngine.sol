@@ -164,6 +164,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     return abi.encodePacked(
       FurLib.traitValue("Level", stats.modifiers.level),
       FurLib.traitNumber("Edition", 0, editionIndex + 1),
+      FurLib.traitValue("Rarity", stats.definition.rarity),
       FurLib.traitValue("EXP Rate", stats.expRate),
       FurLib.traitValue("FUR Rate", stats.furRate),
       FurLib.traitNumber("EXP Boost", 1, _clampBoost(stats.modifiers.expPercent)),

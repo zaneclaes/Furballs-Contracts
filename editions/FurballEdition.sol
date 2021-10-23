@@ -183,12 +183,13 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     rarity = rarity > 0 ? rarity : rollRarity(seed);
     uint8[] memory opts = _parts[slots[uint(i)]].options(rarity);
     if (opts.length == 0) {
-      if (rarity > 1) {
+      if (rarity >= 1) {
         // Rolled a rare attribute, but there were no options. Re-try this roll.
         return rollSlot(seed, i, rarity - 1);
+      } else {
+        // This is a null slot.
+        return (0, 0);
       }
-      // This is a null slot.
-      return (0, 0);
     }
     return (opts[roll(seed) % opts.length] + 1, rarity);
   }

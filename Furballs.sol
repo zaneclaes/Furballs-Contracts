@@ -21,7 +21,7 @@ import "./Fur.sol";
 contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   Fur public fur;
 
-  IFurballEdition[] editions;
+  IFurballEdition[] public editions;
 
   ILootEngine public engine;
 
@@ -67,8 +67,8 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
 
   /// @notice Feeds the furball a snack
   /// @dev Delegates logic to fur
-  function feed(uint256 tokenId, uint32 snackId) external {
-    fur.purchaseSnack(_approvedSender(), tokenId, engine.getSnack(snackId));
+  function feed(uint256 tokenId, uint32 snackId, uint16 count) external {
+    fur.purchaseSnack(_approvedSender(), tokenId, snackId, count);
   }
 
   /// @notice Begins battle/explore modes by changing zones & collecting rewards
@@ -405,13 +405,12 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   // Configuration / Admin
   // -----------------------------------------------------------------------------------------------
 
-  function init(address furAddress, address engineAddress, address gov, address edition) external onlyAdmin {
-    require(!_isReady(), 'RDY');
+  function setFur(address furAddress) external onlyAdmin {
     fur = Fur(furAddress);
-    governance = Governance(gov);
+  }
 
-    setEngine(engineAddress);
-    addEdition(edition, 0);
+  function setGovernance(address addr) public onlyAdmin {
+    governance = Governance(addr);
   }
 
   function setEngine(address addr) public onlyAdmin {
