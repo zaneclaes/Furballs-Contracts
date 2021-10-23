@@ -86,7 +86,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     uint8 rarity = rollRarity(
       uint32(intervals * uint256(modifiers.luckPercent) / FurLib.OneHundredPercent), 0);
     if (rarity == 0) return 0;
-    uint8 stat = uint8(roll(0) % 2);
+    uint8 stat = uint8(roll(modifiers.expPercent) % 2);
     return (stat * 256) + uint16(rarity) * (256 ** 2);
   }
 
@@ -132,7 +132,6 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Raw/base stats
     modifiers.furPercent += uint32(FurLib.OnePercent * modifiers.level * 2);
-    modifiers.weight = uint16(inventory.length);
 
     // First add in the inventory
     for (uint256 i=0; i<modifiers.weight; i++) {
