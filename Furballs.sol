@@ -216,7 +216,8 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
       0, // Baseline zero energy
       context ? furballs[tokenId].zone : 0,
       uint16(furballs[tokenId].inventory.length),
-      furballs[tokenId].level
+      furballs[tokenId].level,
+      uint32(collect[tokenId].length)
     );
 
     // Allow the edition to modify the reward for special zone-based strengths

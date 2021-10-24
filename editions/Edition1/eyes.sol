@@ -17,14 +17,14 @@ contract FurballsEdition1eyes is IFurballPart {
     _options[0].push(6);
     _options[0].push(7);
     _options[3].push(8);
-    _options[0].push(9);
+    _options[1].push(9);
     _options[1].push(10);
     _options[2].push(11);
     _options[2].push(12);
     _options[0].push(13);
     _options[0].push(14);
     _options[0].push(15);
-    _options[0].push(16);
+    _options[1].push(16);
     _options[0].push(17);
     _options[0].push(18);
   }

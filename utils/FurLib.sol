@@ -47,6 +47,7 @@ library FurLib {
     uint32 zone;
     uint16 weight;        // Inventory size
     uint16 level;         // Starting level (at beginning of collection cycle)
+    uint32 moves;         // How many collections have there been?
   }
 
   // For sale via loot engine.
