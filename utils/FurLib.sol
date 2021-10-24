@@ -76,13 +76,20 @@ library FurLib {
     return abi.encodePacked('{"trait_type": "', traitType,'", "value": ', uint2str(value), '}, ');
   }
 
-  function traitNumber(
-    string memory traitType, uint8 displayType, uint256 value
+  /// @notice Convert a modifier percentage (120%) into a metadata +20% boost
+  function traitBoost(
+    string memory traitType, uint256 percent
   ) internal pure returns (bytes memory) {
     return abi.encodePacked('{"trait_type": "', traitType,
-      '", "display_type": "',
-      (displayType == 0 ? 'number' : 'boost_percentage'),
-      '", "value": ', uint2str(value), '}, ');
+      ' Boost", "display_type": "boost_percentage", "value": ',
+      uint2str(percent > 100 ? (percent - 100) : 0), '}, ');
+  }
+
+  function traitNumber(
+    string memory traitType, uint256 value
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked('{"trait_type": "', traitType,
+      '", "display_type": "number", "value": ', uint2str(value), '}, ');
   }
 
   function extractByte(uint256 tokenId, uint8 byteNum) internal pure returns(uint8) {

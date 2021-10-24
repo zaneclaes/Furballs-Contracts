@@ -41,7 +41,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   mapping(address => uint64) public age;
 
   // The amount of time over which FUR/EXP is accrued (usually 360=>1hour)
-  uint256 private _interval;
+  uint256 private _intervalDuration;
 
   event Spawn(uint256 tokenId, address addr, uint8 editionIndex, uint32 editionCount);
   event Play(uint256 tokenId, uint256 responseId);
@@ -49,7 +49,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   event Drop(uint256 tokenId, uint32 slot, uint128 lootId, uint32 count);
 
   constructor(uint256 interval) ERC721("Furballs", "FBL") {
-    _interval = interval;
+    _intervalDuration = interval;
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -206,13 +206,12 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
 
     // Create the base modifiers based upon current level, rarity, and zone.
     uint32 editionIndex = uint32(tokenId % 256);
-    uint256 rarityBoost =  context ? (furballs[tokenId].rarity * FurLib.OnePercent) : 0;
-    uint256 furDecrease = (editionIndex < 4 ? (editionIndex * 20) : 80) * FurLib.OnePercent;
+    uint256 rarityBoost = furballs[tokenId].rarity;
 
     FurLib.RewardModifiers memory reward = FurLib.RewardModifiers(
-      uint32(FurLib.OneHundredPercent + rarityBoost),
-      uint32(FurLib.OneHundredPercent + rarityBoost - furDecrease),
-      uint32(FurLib.OneHundredPercent),
+      uint32(100 + rarityBoost),
+      uint32(100 + rarityBoost - (editionIndex < 4 ? (editionIndex * 20) : 80)),
+      uint32(100 + rarityBoost),
       0, // Baseline zero happiness
       0, // Baseline zero energy
       context ? furballs[tokenId].zone : 0,
@@ -234,7 +233,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
       context ? age[ownerContext] : 0);
 
     // Add happiness/energy to core stats after everything else
-    if (context) reward.expPercent += uint32(reward.happinessPoints * FurLib.OnePercent);
+    if (context) reward.expPercent += reward.happinessPoints;
 
     return reward;
   }
@@ -253,7 +252,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
       uint32 has = furballs[tokenId].experience;
       uint32 max = engine.maxExperience();
       if (res.experience > 0) {
-        has = (has < (max - res.experience)) ? (has + res.experience) : max;
+        has = (res.experience < max && has < (max - res.experience)) ? (has + res.experience) : max;
         furballs[tokenId].experience = has;
 
         uint16 level = expToLevel(has, max);
@@ -273,7 +272,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     }
 
     // Generate loot and assign to furball
-    res.loot = engine.dropLoot(uint32(res.duration / uint64(_interval)), mods);
+    res.loot = engine.dropLoot(uint32(res.duration / uint64(_intervalDuration)), mods);
     if (fur.handleLuck(res.loot > 0, owner)) {
       _pickup(tokenId, res.loot);
     }
@@ -353,18 +352,19 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
       _rewardModifiers(tokenId, contextual ? ownerOf(tokenId) : address(0));
 
     return FurLib.FurballStats(
-      uint32(_calculateReward(_interval, FurLib.EXP_PER_INTERVAL, mods.expPercent)),
-      uint32(_calculateReward(_interval, FurLib.FUR_PER_INTERVAL, mods.furPercent)),
+      uint32(_calculateReward(_intervalDuration, FurLib.EXP_PER_INTERVAL, mods.expPercent)),
+      uint32(_calculateReward(_intervalDuration, FurLib.FUR_PER_INTERVAL, mods.furPercent)),
       mods,
       furballs[tokenId],
       fur.snacks(tokenId)
     );
   }
 
+  /// @notice This utility function is useful because it force-casts arguments to uint256
   function _calculateReward(
     uint256 duration, uint256 perInterval, uint256 percentBoost
   ) internal view returns(uint256) {
-    return (duration * percentBoost * perInterval) / (FurLib.OneHundredPercent * _interval);
+    return (duration * percentBoost * perInterval) / (100 * _intervalDuration);
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -375,7 +375,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   /// @dev see https://docs.opensea.io/docs/contract-level-metadata
   function contractURI() public view returns (string memory) {
     return string(abi.encodePacked("data:application/json;base64,", FurLib.encode(abi.encodePacked(
-      '{"name": "Furballs", "description": "A game built entirely on the blockchain"',
+      '{"name": "Furballs", "description": "', engine.description(),'"',
       ', "external_link": "https://furballs.com"',
       ', "seller_fee_basis_points": 250, "fee_recipient": "',
       FurLib.bytesHex(abi.encodePacked(address(this))), '"}'

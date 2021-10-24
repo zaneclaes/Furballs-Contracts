@@ -181,9 +181,9 @@ contract Fur is ERC20 {
   function _handleLuck(bool goodLuck, address to) internal returns (bool) {
     if (goodLuck) {
       badLuck[to] = 0;
-    } else if(badLuck[to] < FurLib.OneHundredPercent) {
+    } else if(badLuck[to] < 100) {
       // Bad luck caps out at 100% max
-      badLuck[to] += uint32(5 * FurLib.OnePercent);
+      badLuck[to] += 5;
     }
     return goodLuck;
   }

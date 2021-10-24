@@ -9,8 +9,11 @@ import "../utils/FurLib.sol";
 /// @author LFG Gaming LLC
 /// @notice The loot engine is patchable by replacing the Furballs' engine with a new version
 interface ILootEngine is IERC165 {
+  /// @notice Patchable game description for updates in store metadata
+  function description() external pure returns (string memory);
+
   /// @notice Max experience (and thus max level) could grow over time
-  function maxExperience() external view returns(uint32);
+  function maxExperience() external pure returns(uint32);
 
   /// @notice When a Furball comes back from exploration, potentially give it some loot.
   function dropLoot(uint32 intervals, FurLib.RewardModifiers memory mods) external returns(uint128);

@@ -22,8 +22,16 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     _proxies = ProxyRegistry(proxyRegistry);
   }
 
+  /// @notice Hardcoded description for OpenSea
+  function description() external virtual override pure returns (string memory) {
+    return string(abi.encodePacked(
+      "Furballs is a collectible NFT game, entirely on-chain. ",
+      "There are trillions of possible furball combinations."
+    ));
+  }
+
   /// @notice maxExperience is simply hardcoded for now.
-  function maxExperience() external virtual override view returns(uint32) {
+  function maxExperience() external virtual override pure returns(uint32) {
     return 2010000;
   }
 
@@ -71,7 +79,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
     require(rarity > 0 && rarity < 3, 'RARITY');
     uint32 threshold = FurLib.Max32 / 1000 * (1000 - (rarity == 1 ? 75 : 25));
-    uint256 rolled = uint256(roll(0)) * uint256(modifiers.luckPercent) / FurLib.OneHundredPercent;
+    uint256 rolled = (uint256(roll(0)) * uint256(modifiers.luckPercent)) / 100;
 
     if (rolled <= threshold) return 0;
     return (stat * 256) + uint16(rarity + 1) * (256 ** 2);
@@ -87,7 +95,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     if (modifiers.weight >= 50) return 0;
 
     (uint8 rarity, uint8 stat) = rollRarity(
-      uint32(intervals * uint256(modifiers.luckPercent) / FurLib.OneHundredPercent), 0);
+      uint32((intervals * uint256(modifiers.luckPercent)) / 100), 0);
     if (rarity == 0) return 0;
     return (uint16(rarity) * (256 ** 2)) + (stat * 256);
   }
@@ -135,13 +143,13 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     uint64 accountCreatedAt
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Raw/base stats
-    modifiers.furPercent += uint32(FurLib.OnePercent * modifiers.level * 2);
+    modifiers.furPercent += uint32(modifiers.level * 2);
 
     // First add in the inventory
     for (uint256 i=0; i<modifiers.weight; i++) {
       uint128 lootId = uint128(inventory[i] / 256);
       uint32 stackSize = uint32(inventory[i] % 256);
-      uint32 boost = uint32(itemRarity(lootId) * stackSize * 5 * FurLib.OnePercent);
+      uint32 boost = uint32(itemRarity(lootId) * stackSize * 5);
       if (itemStat(lootId) == 0) {
         modifiers.expPercent += boost;
       } else {
@@ -151,11 +159,11 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
     // Reward players for holding, but also punish the whales...
     if (teamSize < 10 && teamSize > 1) {
-      uint32 amt = uint32(2 * (teamSize - 1) * FurLib.OnePercent);
+      uint32 amt = uint32(2 * (teamSize - 1));
       modifiers.expPercent += amt;
       modifiers.furPercent += amt;
     } else if (teamSize > 10) {
-      uint32 amt = uint32(5 * (teamSize > 20 ? 10 : (teamSize - 10)) * FurLib.OnePercent);
+      uint32 amt = uint32(5 * (teamSize > 20 ? 10 : (teamSize - 10)));
       modifiers.expPercent -= amt;
       modifiers.furPercent -= amt;
     }
@@ -169,17 +177,18 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     FurLib.FurballStats memory stats = furballs.stats(tokenId, false);
     return abi.encodePacked(
       FurLib.traitValue("Level", stats.modifiers.level),
-      FurLib.traitNumber("Edition", 0, (tokenId % 256) + 1),
+      FurLib.traitNumber("Edition", (tokenId % 256) + 1),
       FurLib.traitValue("Rarity", stats.definition.rarity),
       FurLib.traitValue("EXP Rate", stats.expRate),
       FurLib.traitValue("FUR Rate", stats.furRate),
-      FurLib.traitNumber("EXP Boost", 1, _clampBoost(stats.modifiers.expPercent)),
-      FurLib.traitNumber("FUR Boost", 1, _clampBoost(stats.modifiers.furPercent))
+      FurLib.traitBoost("EXP", stats.modifiers.expPercent),
+      FurLib.traitBoost("FUR", stats.modifiers.furPercent)
     );
   }
 
-  function _clampBoost(uint32 percent) internal pure returns(uint256) {
-    return percent > FurLib.OneHundredPercent ? (percent / FurLib.OnePercent - 100) : 0;
+  /// @notice Converts a multiplier percentage (120%) into an "increase percent" (20%)
+  function _boostPercent(uint32 percent) internal pure returns(uint256) {
+    return percent > 100 ? (percent - 100) : 0;
   }
 
   // function _renderBoostAttribute(string memory trait, uint256 points) internal pure returns (bytes memory) {
