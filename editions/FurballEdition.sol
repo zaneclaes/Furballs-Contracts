@@ -39,7 +39,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   IFurballPaths[] private _paths;
 
   uint32[4] private rarities = [
-    FurLib.Max32 / 1000 * 738, // 20%
+    FurLib.Max32 / 1000 * 848, // 9%
     FurLib.Max32 / 1000 * 938, // 5%
     FurLib.Max32 / 1000 * 988, // 1%
     FurLib.Max32 / 1000 * 998  // 0.2%

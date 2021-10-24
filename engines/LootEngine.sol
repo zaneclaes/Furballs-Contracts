@@ -86,28 +86,28 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     if (FurLib.isBattleZone(modifiers.zone)) return 0;
     if (modifiers.weight >= 50) return 0;
 
-    uint8 rarity = rollRarity(
+    (uint8 rarity, uint8 stat) = rollRarity(
       uint32(intervals * uint256(modifiers.luckPercent) / FurLib.OneHundredPercent), 0);
     if (rarity == 0) return 0;
-    uint8 stat = uint8(roll(0) % 2);
     return (uint16(rarity) * (256 ** 2)) + (stat * 256);
   }
 
   /// @notice Core loot drop rarity randomization
-  function rollRarity(uint32 chance, uint32 seed) public returns(uint8) {
+  function rollRarity(uint32 chance, uint32 seed) public returns(uint8, uint8) {
     uint32 threshold = 4320;
     if (chance > threshold) {
       // When the chance given is higher than the highest rarity, just give the highest.
       return 3;
     }
     uint32 rolled = roll(seed) % threshold;
+    uint8 stat = rolled % 2;
 
-    if (chance > threshold || rolled >= (threshold - chance)) return 3;
+    if (chance > threshold || rolled >= (threshold - chance)) return (3, stat);
     threshold -= chance;
-    if (chance * 2 > threshold || rolled >= (threshold - chance * 2)) return 2;
+    if (chance * 2 > threshold || rolled >= (threshold - chance * 2)) return (2, stat);
     threshold -= chance * 2;
-    if (chance * 4 > threshold || rolled >= (threshold - chance * 4)) return 1;
-    return 0;
+    if (chance * 4 > threshold || rolled >= (threshold - chance * 4)) return (1, stat);
+    return (0, stat);
   }
 
   /// @notice The snack shop has IDs for each snack definition

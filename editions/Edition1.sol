@@ -28,10 +28,10 @@ contract Edition1 is FurballEdition {
 
   function purchaseFur() public override view returns(uint256) {
     if (count < maxAdoptable) return 0;
-    if (count < (maxAdoptable + 1000)) return  2000;
-    if (count < (maxAdoptable + 2000)) return  4000;
-    if (count < (maxAdoptable + 3000)) return  8000;
-    if (count < (maxAdoptable + 4000)) return 16000;
-    return 32000;
+    if (count < (maxAdoptable + 1000)) return  4000;
+    if (count < (maxAdoptable + 2000)) return  8000;
+    if (count < (maxAdoptable + 3000)) return 16000;
+    if (count < (maxAdoptable + 4000)) return 32000;
+    return 64000;
   }
 }
