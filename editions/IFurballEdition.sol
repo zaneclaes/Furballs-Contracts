@@ -29,5 +29,5 @@ interface IFurballEdition is IERC165 {
     uint256 tokenId, FurLib.RewardModifiers memory modifiers
   ) external view returns(FurLib.RewardModifiers memory);
 
-  function tokenData(uint256 tokenId, uint256 number, uint64 birth, bytes memory attributes) external view returns(bytes memory);
+  function tokenData(uint256 tokenId, uint256 number, uint64 birth) external view returns(bytes memory);
 }

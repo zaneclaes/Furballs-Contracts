@@ -27,13 +27,14 @@ interface ILootEngine is IERC165 {
 
   /// @notice Calculates the effects of the loot in a Furball's inventory
   function modifyReward(
+    uint256[] memory inventory,
     FurLib.RewardModifiers memory baseModifiers,
     uint32 teamSize,
-    uint256[] memory inventory
+    uint64 accountCreatedAt
   ) external view returns(FurLib.RewardModifiers memory);
 
   /// @notice JSON object for displaying metadata on OpenSea, etc.
-  function renderAttributes(uint8 editionIndex, FurLib.FurballStats memory stats) external view returns(bytes memory);
+  function renderAttributes(uint256 tokenId) external view returns(bytes memory);
 
   /// @notice Get a potential snack for the furball by its ID
   function getSnack(uint32 snack) external view returns(FurLib.Snack memory);

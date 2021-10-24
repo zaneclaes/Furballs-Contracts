@@ -37,6 +37,9 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   // tokenId => all rewards assigned to that Furball
   mapping(uint256 => FurLib.Rewards[]) public collect;
 
+  // When did this address get its first furball?
+  mapping(address => uint64) public age;
+
   // The amount of time over which FUR/EXP is accrued (usually 360=>1hour)
   uint256 private _interval;
 
@@ -91,34 +94,16 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     }
   }
 
-  /// @notice Internal implementation of playMany/playOne
-  function _play(uint256 tokenId, uint32 zone, address sender, uint256[] memory team) internal {
-    address owner = ownerOf(tokenId);
-
-    // The engine is allowed to force furballs into exploration mode
-    // This allows it to end a battle early, which will be necessary in PvP
-    require(owner == sender || address(engine) == sender, 'OWN');
-
-    // Check zone preconditions
-    zone = uint32(engine.enterZone(tokenId, zone, team));
-
-    // Run reward collection
-    _collect(tokenId);
-
-    // Set new zone
-    furballs[tokenId].zone = zone;
-  }
-
   /// @notice Re-dropping loot allows players to pay $FUR to re-roll an inventory slot
   /// @param tokenId The furball in question
   /// @param lootId The lootId in its inventory to re-roll
   function upgrade(uint256 tokenId, uint128 lootId) external {
     // Attempt upgrade (random chance).
-    uint128 upgrade = fur.purchaseUpgrade(
-      _approvedSender(), tokenId, lootId, _baseModifiers(tokenId));
-    if (upgrade != 0) {
+    uint128 up = fur.purchaseUpgrade(
+      _approvedSender(), tokenId, lootId, _rewardModifiers(tokenId, address(0)));
+    if (up != 0) {
       _drop(tokenId, lootId, 1);
-      _pickup(tokenId, upgrade);
+      _pickup(tokenId, up);
     }
   }
 
@@ -137,7 +122,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   function loot(uint256[] memory tokenIds, uint32 chance) external onlyGame {
     for (uint256 i=0; i<tokenIds.length; i++) {
       uint256 tokenId = tokenIds[i];
-      uint128 lootId = engine.dropLoot(chance, _baseModifiers(tokenId));
+      uint128 lootId = engine.dropLoot(chance, _rewardModifiers(tokenId, address(0)));
       if (lootId != 0) _pickup(tokenId, lootId);
     }
   }
@@ -155,6 +140,25 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   // Internal
   // -----------------------------------------------------------------------------------------------
 
+  /// @notice Internal implementation of playMany/playOne
+  function _play(uint256 tokenId, uint32 zone, address sender, uint256[] memory team) internal {
+    address owner = ownerOf(tokenId);
+
+    // The engine is allowed to force furballs into exploration mode
+    // This allows it to end a battle early, which will be necessary in PvP
+    require(owner == sender || address(engine) == sender, 'OWN');
+
+    // Check zone preconditions
+    zone = uint32(engine.enterZone(tokenId, zone, team));
+
+    // Run reward collection
+    _collect(tokenId);
+
+    // Set new zone
+    furballs[tokenId].zone = zone;
+  }
+
+  /// @notice Remove an inventory item from a furball
   function _drop(uint256 tokenId, uint128 lootId, uint32 count) internal {
     uint32 slot = inventories[tokenId][lootId];
     require(slot > 0 && slot <= uint32(furballs[tokenId].inventory.length), 'SLOT');
@@ -195,11 +199,14 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
 
   /// @notice Calculates full reward modifier stack for a furball in a zone.
   function _rewardModifiers(
-    uint256 tokenId, uint32 rarity, uint32 teamSize, uint32 zone
+    uint256 tokenId, address ownerContext
   ) internal view returns(FurLib.RewardModifiers memory) {
+    // uint32 rarity, uint32 teamSize, uint32 zone, uint64 accountCreatedAt
+    bool context = ownerContext != address(0);
+
     // Create the base modifiers based upon current level, rarity, and zone.
     uint32 editionIndex = uint32(tokenId % 256);
-    uint256 rarityBoost =  rarity * FurLib.OnePercent;
+    uint256 rarityBoost =  context ? (furballs[tokenId].rarity * FurLib.OnePercent) : 0;
     uint256 furDecrease = (editionIndex < 4 ? (editionIndex * 20) : 80) * FurLib.OnePercent;
 
     FurLib.RewardModifiers memory reward = FurLib.RewardModifiers(
@@ -208,7 +215,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
       uint32(FurLib.OneHundredPercent),
       0, // Baseline zero happiness
       0, // Baseline zero energy
-      zone,
+      context ? furballs[tokenId].zone : 0,
       uint16(furballs[tokenId].inventory.length),
       furballs[tokenId].level
     );
@@ -220,18 +227,16 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     reward = fur.modifyReward(tokenId, reward);
 
     // Engine will consider inventory and team size in zone
-    reward = engine.modifyReward(reward, teamSize, furballs[tokenId].inventory);
+    reward = engine.modifyReward(
+      furballs[tokenId].inventory,
+      reward,
+      uint32(context && !isAdmin(ownerContext) ? balanceOf(ownerContext) : 0),
+      context ? age[ownerContext] : 0);
 
     // Add happiness/energy to core stats after everything else
-    reward.expPercent += uint32(reward.happinessPoints * FurLib.OnePercent);
-    reward.furPercent += uint32(reward.energyPoints * FurLib.OnePercent);
+    if (context) reward.expPercent += uint32(reward.happinessPoints * FurLib.OnePercent);
 
     return reward;
-  }
-
-  /// @notice computes the rewardModifiers without any context bias
-  function _baseModifiers(uint256 tokenId) internal view returns (FurLib.RewardModifiers memory) {
-    return _rewardModifiers(tokenId, furballs[tokenId].rarity, 0, 0);
   }
 
   /// @notice Ends the current explore/battle and dispenses rewards
@@ -241,8 +246,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     FurLib.Rewards memory res = FurLib.Rewards(
       uint64(block.timestamp) - furballs[tokenId].last, 0,0,0,0);
 
-    FurLib.RewardModifiers memory mods = _rewardModifiers(
-      tokenId, furballs[tokenId].rarity, uint32(balanceOf(owner)), furballs[tokenId].zone);
+    FurLib.RewardModifiers memory mods = _rewardModifiers(tokenId, owner);
 
     if (!FurLib.isBattleZone(mods.zone)) { // Explore!
       res.experience = uint32(_calculateReward(res.duration, FurLib.EXP_PER_INTERVAL, mods.expPercent));
@@ -251,12 +255,13 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
       if (res.experience > 0) {
         has = (has < (max - res.experience)) ? (has + res.experience) : max;
         furballs[tokenId].experience = has;
-        furballs[tokenId].level = computeLevel(has, max);
 
-        if (furballs[tokenId].level > mods.level) {
-          res.levels = (furballs[tokenId].level - mods.level);
-          if (address(governance) != address(0))
-            governance.levelUp(owner, mods.level, furballs[tokenId].level);
+        uint16 level = expToLevel(has, max);
+        furballs[tokenId].level = level;
+
+        if (level > mods.level) {
+          res.levels = (level - mods.level);
+          if (address(governance) != address(0)) governance.levelUp(owner, mods.level, level);
         }
       }
     } else { // Battle!
@@ -267,6 +272,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
       }
     }
 
+    // Generate loot and assign to furball
     res.loot = engine.dropLoot(uint32(res.duration / uint64(_interval)), mods);
     if (fur.handleLuck(res.loot > 0, owner)) {
       _pickup(tokenId, res.loot);
@@ -310,7 +316,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     require(cnt < max, "MAX");
 
     // Create the memory struct that represens the furball
-   uint256[] memory inv;
+    uint256[] memory inv;
     furballs[tokenId] = FurLib.Furball(
       totalSupply() + 1, cnt, rarity, 0, 0, 0,
       uint64(block.timestamp), uint64(block.timestamp), uint64(block.timestamp), inv);
@@ -333,6 +339,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     furballs[tokenId].trade = uint64(block.timestamp);
     engine.onTrade(from, to, tokenId);
 
+    if (age[to] == 0) age[to] = uint64(block.timestamp);
     if (address(governance) != address(0)) governance.transfer(from, to, furballs[tokenId].level);
   }
 
@@ -340,9 +347,10 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   // Game Engine & Moderation
   // -----------------------------------------------------------------------------------------------
 
-  function stats(uint256 tokenId) public view returns(FurLib.FurballStats memory) {
+  function stats(uint256 tokenId, bool contextual) public view returns(FurLib.FurballStats memory) {
     // Base stats are calculated without team size so this doesn't effect public metadata
-    FurLib.RewardModifiers memory mods = _baseModifiers(tokenId);
+    FurLib.RewardModifiers memory mods =
+      _rewardModifiers(tokenId, contextual ? ownerOf(tokenId) : address(0));
 
     return FurLib.FurballStats(
       uint32(_calculateReward(_interval, FurLib.EXP_PER_INTERVAL, mods.expPercent)),
@@ -383,8 +391,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
       editions[editionIndex].tokenData(
         tokenId,
         furballs[tokenId].number,
-        furballs[tokenId].birth,
-        engine.renderAttributes(editionIndex, stats(tokenId))
+        furballs[tokenId].birth
       )
     ))));
   }

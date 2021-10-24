@@ -63,7 +63,7 @@ library FurLib {
   uint32 public constant Max32 = type(uint32).max;
 
   uint32 public constant EXP_PER_INTERVAL = 500;
-  uint32 public constant FUR_PER_INTERVAL = 10;
+  uint32 public constant FUR_PER_INTERVAL = 100;
 
   uint256 public constant OnePercent = 1000;
   uint256 public constant OneHundredPercent = 100000;

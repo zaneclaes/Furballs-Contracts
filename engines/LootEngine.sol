@@ -95,12 +95,8 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   /// @notice Core loot drop rarity randomization
   function rollRarity(uint32 chance, uint32 seed) public returns(uint8, uint8) {
     uint32 threshold = 4320;
-    if (chance > threshold) {
-      // When the chance given is higher than the highest rarity, just give the highest.
-      return 3;
-    }
     uint32 rolled = roll(seed) % threshold;
-    uint8 stat = rolled % 2;
+    uint8 stat = uint8(rolled % 2);
 
     if (chance > threshold || rolled >= (threshold - chance)) return (3, stat);
     threshold -= chance;
@@ -118,24 +114,25 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
       if (snackSize == 1) {
         snack.duration = 8 * 360;
         snack.happiness = 15;
-        snack.furCost = 10;
+        snack.furCost = 100;
       } else if (snackSize == 2) {
         snack.duration = 24 * 360;
         snack.happiness = 20;
-        snack.furCost = 30;
+        snack.furCost = 300;
       } else if (snackSize == 3) {
         snack.duration = 72 * 360;
         snack.happiness = 25;
-        snack.furCost = 90;
+        snack.furCost = 900;
       }
     }
     return snack;
   }
 
   function modifyReward(
+    uint256[] memory inventory,
     FurLib.RewardModifiers memory modifiers,
     uint32 teamSize,
-    uint256[] memory inventory
+    uint64 accountCreatedAt
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Raw/base stats
     modifiers.furPercent += uint32(FurLib.OnePercent * modifiers.level * 2);
@@ -167,11 +164,12 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   }
 
   function renderAttributes(
-    uint8 editionIndex, FurLib.FurballStats memory stats
+    uint256 tokenId
   ) external virtual override view returns(bytes memory) {
+    FurLib.FurballStats memory stats = furballs.stats(tokenId, false);
     return abi.encodePacked(
       FurLib.traitValue("Level", stats.modifiers.level),
-      FurLib.traitNumber("Edition", 0, editionIndex + 1),
+      FurLib.traitNumber("Edition", 0, (tokenId % 256) + 1),
       FurLib.traitValue("Rarity", stats.definition.rarity),
       FurLib.traitValue("EXP Rate", stats.expRate),
       FurLib.traitValue("FUR Rate", stats.furRate),

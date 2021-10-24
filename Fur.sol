@@ -23,7 +23,7 @@ contract Fur is ERC20 {
 
   constructor(address furballsAddress) ERC20("Fur", "FUR") {
     furballs = Furballs(payable(furballsAddress));
-    _mint(msg.sender, 40000);
+    _mint(msg.sender, 400000);
   }
 
   /// @notice FUR can only be minted by furballs doing battle.
@@ -99,7 +99,7 @@ contract Fur is ERC20 {
     address owner = furballs.ownerOf(tokenId);
 
     // _gift will throw if cannot gift or cannot afford cost
-    _gift(from, owner, 1000);
+    _gift(from, owner, 10000);
 
     uint128 upgrade = furballs.engine().upgradeLoot(owner, lootId, modifiers);
     _handleLuck(upgrade != 0, owner);

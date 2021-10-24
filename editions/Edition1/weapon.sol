@@ -31,7 +31,7 @@ contract FurballsEdition1weapon is IFurballPart {
   }
 
   function name(uint8 idx) external pure override returns(string memory) {
-    if (idx == 0) return "Asparagus";
+    if (idx == 0) return "Asparagus Spear";
     if (idx == 1) return "Butter Knife";
     if (idx == 2) return "Poop Squasher";
     if (idx == 3) return "Sad Pencil";
