@@ -34,7 +34,9 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   mapping(address => uint32) internal _whitelist;
 
-  mapping(uint256 => string) internal _names;
+  mapping(uint256 => string) public names;
+
+  mapping(uint256 => string) public descriptions;
 
   IFurballPaths[] private _paths;
 
@@ -71,45 +73,51 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     }
   }
 
-  function tokenData(
-    uint256 tokenId, uint256 number, uint64 birth
+  /// @notice Metadata loader
+  function tokenMetadata(
+    uint256 tokenId, uint256 number, uint64 birth, uint64 trade
   ) external virtual override view returns(bytes memory) {
     bytes memory attributes = abi.encodePacked(
       '[',
-        furballs.engine().renderAttributes(tokenId),
+        furballs.engine().attributesMetadata(tokenId),
         _getAttributes(tokenId),
-        // '{"display_type": "date", "trait_type": "Acquired", "value": ', FurLib.uint2str(furballs[tokenId].trade),
-        '{"display_type": "date", "trait_type": "Birthday", "value": ', FurLib.uint2str(birth),
+        '{"display_type": "date", "trait_type": "Acquired", "value": ', FurLib.uint2str(trade),
+        '}, {"display_type": "date", "trait_type": "Birthday", "value": ', FurLib.uint2str(birth),
       '}]'
     );
 
     return abi.encodePacked(
-      '{"name": "', _getName(tokenId, number),
+      '{"name": "', _nameOf(tokenId, number),
         '", "external_url": "https://furballs.com/#/furball/', FurLib.bytesHex(abi.encodePacked(tokenId)),
         '", "background_color": "', _palette.backgroundColor(FurLib.extractByte(tokenId, 2)),
         '", "image": "data:image/svg+xml;base64,', FurLib.encode(_render(tokenId)),
-        '", "description": "Visit Furballs.com for the latest stats and rankings.", "attributes": ',
+        '", "description": "', _descriptionOf(tokenId),'", "attributes": ',
         attributes,
       '}'
     );
   }
 
-  function _getName(uint256 tokenId, uint256 number) internal virtual view returns(string memory) {
-    string memory name = _names[tokenId];
-    if (bytes(name).length > 0) return name;
-    return string(abi.encodePacked("Furball #", FurLib.uint2str(number)));
-  }
-
-  function setNames(uint256[] memory tokenIds, string[] memory names) external {
+  /// @notice Moderators or the game itself can customize a furball with names & descriptions
+  function customize(uint256 tokenId, string memory fbName, string memory fbDesc) external {
     require(
       furballs.isModerator(msg.sender) ||
       furballs.isAdmin(msg.sender) ||
       address(furballs.engine()) == msg.sender
     );
-    require(tokenIds.length == names.length, 'LEN');
-    for (uint256 i=0; i<tokenIds.length; i++) {
-      _names[tokenIds[i]] = names[i];
-    }
+    names[tokenId] = fbName;
+    descriptions[tokenId] = fbDesc;
+  }
+
+  function _nameOf(uint256 tokenId, uint256 number) internal virtual view returns(string memory) {
+    string memory fbName = names[tokenId];
+    return string(abi.encodePacked(
+      bytes(fbName).length > 0 ? fbName : "Furball", " #", FurLib.uint2str(number)));
+  }
+
+  function _descriptionOf(uint256 tokenId) internal view returns (string memory) {
+    string memory fbDesc = descriptions[tokenId];
+    return (bytes(fbDesc).length > 0) ? fbDesc :
+      "Visit Furballs.com for the latest stats and rankings.";
   }
 
   function addCount(address to, uint32 amount) external override returns(bool) {

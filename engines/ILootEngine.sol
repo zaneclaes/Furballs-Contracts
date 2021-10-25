@@ -9,6 +9,9 @@ import "../utils/FurLib.sol";
 /// @author LFG Gaming LLC
 /// @notice The loot engine is patchable by replacing the Furballs' engine with a new version
 interface ILootEngine is IERC165 {
+  /// @notice Patchable game name for updates in store metadata
+  function name() external pure returns (string memory);
+
   /// @notice Patchable game description for updates in store metadata
   function description() external pure returns (string memory);
 
@@ -22,6 +25,7 @@ interface ILootEngine is IERC165 {
   function upgradeLoot(
     address owner,
     uint128 lootId,
+    uint8 chances,
     FurLib.RewardModifiers memory modifiers
   ) external returns(uint128);
 
@@ -38,7 +42,7 @@ interface ILootEngine is IERC165 {
   ) external view returns(FurLib.RewardModifiers memory);
 
   /// @notice JSON object for displaying metadata on OpenSea, etc.
-  function renderAttributes(uint256 tokenId) external view returns(bytes memory);
+  function attributesMetadata(uint256 tokenId) external view returns(bytes memory);
 
   /// @notice Get a potential snack for the furball by its ID
   function getSnack(uint32 snack) external view returns(FurLib.Snack memory);

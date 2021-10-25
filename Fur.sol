@@ -15,15 +15,12 @@ contract Fur is ERC20 {
   // Simple reason: this contract had more space, and is the only other allowed to know about ownership
   // Thus it serves as a sort of shop meta-store for Furballs
 
-  // Counter of zero-loot-drops.
-  mapping(address => uint32) public badLuck;
-
   // tokenId => mapping of fed _snacks
   mapping(uint256 => FurLib.Snack[]) public _snacks;
 
-  constructor(address furballsAddress) ERC20("Fur", "FUR") {
+  constructor(address furballsAddress, uint256 startingBalance) ERC20("Fur", "FUR") {
     furballs = Furballs(furballsAddress);
-    _mint(msg.sender, 400000);
+    _mint(msg.sender, startingBalance);
   }
 
   /// @notice FUR can only be minted by furballs doing battle.
@@ -53,7 +50,6 @@ contract Fur is ERC20 {
   ) external view returns(FurLib.RewardModifiers memory) {
     // Add to base luck percent stat with the bad luck of the owner
     address owner = furballs.ownerOf(tokenId);
-    modifiers.luckPercent += badLuck[owner];
 
     for (uint32 i=0; i<_snacks[tokenId].length && i <= FurLib.Max32; i++) {
       uint256 remaining = _snackTimeRemaning(_snacks[tokenId][i]);
@@ -64,12 +60,6 @@ contract Fur is ERC20 {
     }
 
     return modifiers;
-  }
-
-  /// @notice Updates "badLuck" stat, which creates loot drop boosts over time
-  /// @dev Delegated logic from Furballs; returns input luck state for clean if/elses
-  function handleLuck(bool goodLuck, address to) external onlyGame returns (bool) {
-    return _handleLuck(goodLuck, to);
   }
 
   /// @notice Pay any necessary fees to mint a furball
@@ -94,17 +84,15 @@ contract Fur is ERC20 {
   /// @notice Attempts to purchase an upgrade for a loot item
   /// @dev Delegated logic from Furballs
   function purchaseUpgrade(
-    address from, uint256 tokenId, uint128 lootId, FurLib.RewardModifiers memory modifiers
+    address from, uint256 tokenId, uint128 lootId, uint8 chances,
+    FurLib.RewardModifiers memory modifiers
   ) external onlyGame returns(uint128) {
     address owner = furballs.ownerOf(tokenId);
 
     // _gift will throw if cannot gift or cannot afford cost
-    _gift(from, owner, 10000);
+    _gift(from, owner, 10000 * uint256(chances));
 
-    uint128 upgrade = furballs.engine().upgradeLoot(owner, lootId, modifiers);
-    _handleLuck(upgrade != 0, owner);
-
-    return upgrade;
+    return furballs.engine().upgradeLoot(owner, lootId, chances, modifiers);
   }
 
   /// @notice Attempts to purchase a snack using templates found in the engine
@@ -137,9 +125,8 @@ contract Fur is ERC20 {
   function _cleanSnack(uint256 tokenId, uint32 snackId) internal returns(uint256) {
     uint256 ret = 0;
     for (uint32 i=1; i<=_snacks[tokenId].length && i <= FurLib.Max32; i++) {
-      FurLib.Snack memory snack = _snacks[tokenId][i-1];
       // Has the snack transitioned from active to inactive?
-      if (_snackTimeRemaning(snack) == 0) {
+      if (_snackTimeRemaning(_snacks[tokenId][i-1]) == 0) {
         if (_snacks[tokenId].length > 1) {
           _snacks[tokenId][i-1] = _snacks[tokenId][_snacks[tokenId].length - 1];
         }
@@ -175,17 +162,6 @@ contract Fur is ERC20 {
     }
 
     return isGift;
-  }
-
-  /// @notice Internal implementation of luck
-  function _handleLuck(bool goodLuck, address to) internal returns (bool) {
-    if (goodLuck) {
-      badLuck[to] = 0;
-    } else if(badLuck[to] < 100) {
-      // Bad luck caps out at 100% max
-      badLuck[to] += 5;
-    }
-    return goodLuck;
   }
 
   modifier onlyGame() {

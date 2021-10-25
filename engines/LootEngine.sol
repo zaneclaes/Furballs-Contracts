@@ -23,6 +23,11 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   }
 
   /// @notice Hardcoded description for OpenSea
+  function name() external virtual override pure returns (string memory) {
+    return "Furballs";
+  }
+
+  /// @notice Hardcoded description for OpenSea
   function description() external virtual override pure returns (string memory) {
     return string(abi.encodePacked(
       "Furballs is a collectible NFT game, entirely on-chain. ",
@@ -44,7 +49,9 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   }
 
   /// @notice Proxy logic is presently delegated to OpenSea-like contract
-  function canProxyTrades(address owner, address operator) external virtual override view onlyFurballs returns(bool) {
+  function canProxyTrades(
+    address owner, address operator
+  ) external virtual override view onlyFurballs returns(bool) {
     if (address(_proxies) == address(0)) return false;
     return address(_proxies.proxies(owner)) == operator;
   }
@@ -72,17 +79,17 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   function upgradeLoot(
     address owner,
     uint128 lootId,
+    uint8 chances,
     FurLib.RewardModifiers memory modifiers
   ) external virtual override returns(uint128) {
-    uint8 rarity = itemRarity(lootId);
-    uint8 stat = itemStat(lootId);
+    (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
 
     require(rarity > 0 && rarity < 3, 'RARITY');
-    uint32 threshold = FurLib.Max32 / 1000 * (1000 - (rarity == 1 ? 75 : 25));
-    uint256 rolled = (uint256(roll(0)) * uint256(modifiers.luckPercent)) / 100;
+    uint32 threshold = (FurLib.Max32 / 1000) * (1000 - (rarity == 1 ? 75 : 25));
+    uint256 rolled = (uint256(roll(modifiers.expPercent)) * uint256(modifiers.luckPercent) * uint256(chances)) / 100;
 
     if (rolled <= threshold) return 0;
-    return (stat * 256) + uint16(rarity + 1) * (256 ** 2);
+    return (stat * 256) + (uint16(rarity + 1) * (256 ** 2));
   }
 
   /// @notice Main loot-drop functionm
@@ -94,14 +101,15 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     if (FurLib.isBattleZone(modifiers.zone)) return 0;
     if (modifiers.weight >= 50) return 0;
 
-    (uint8 rarity, uint8 stat) = rollRarity(
-      uint32((intervals * uint256(modifiers.luckPercent)) / 100), 0);
+    (uint8 rarity, uint8 stat) = rollRarityStat(
+      uint32((intervals * uint256(modifiers.luckPercent)) /100), 0);
     if (rarity == 0) return 0;
     return (uint16(rarity) * (256 ** 2)) + (stat * 256);
   }
 
   /// @notice Core loot drop rarity randomization
-  function rollRarity(uint32 chance, uint32 seed) public returns(uint8, uint8) {
+  /// @dev exposes an interface helpful for the unit tests, but is not otherwise called publicly
+  function rollRarityStat(uint32 chance, uint32 seed) public returns(uint8, uint8) {
     uint32 threshold = 4320;
     uint32 rolled = roll(seed) % threshold;
     uint8 stat = uint8(rolled % 2);
@@ -136,6 +144,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     return snack;
   }
 
+  /// @notice Layers on LootEngine modifiers to rewards
   function modifyReward(
     uint256[] memory inventory,
     FurLib.RewardModifiers memory modifiers,
@@ -144,14 +153,15 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     uint64 accountCreatedAt
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Raw/base stats
-    modifiers.furPercent += uint32(modifiers.level * 2);
+    modifiers.furPercent += _furBoost(modifiers.level);
 
     // First add in the inventory
     for (uint256 i=0; i<modifiers.weight; i++) {
       uint128 lootId = uint128(inventory[i] / 256);
       uint32 stackSize = uint32(inventory[i] % 256);
-      uint32 boost = uint32(itemRarity(lootId) * stackSize * 5);
-      if (itemStat(lootId) == 0) {
+      (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
+      uint32 boost = uint32(rarity * stackSize * 5);
+      if (stat == 0) {
         modifiers.expPercent += boost;
       } else {
         modifiers.furPercent += boost;
@@ -172,7 +182,8 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     return modifiers;
   }
 
-  function renderAttributes(
+  /// @notice OpenSea metadata
+  function attributesMetadata(
     uint256 tokenId
   ) external virtual override view returns(bytes memory) {
     FurLib.FurballStats memory stats = furballs.stats(tokenId, false);
@@ -188,36 +199,22 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     );
   }
 
-  /// @notice Converts a multiplier percentage (120%) into an "increase percent" (20%)
-  function _boostPercent(uint32 percent) internal pure returns(uint256) {
-    return percent > 100 ? (percent - 100) : 0;
+  /// @notice Gets the FUR boost for a given level
+  function _furBoost(uint32 level) internal pure returns (uint32) {
+    if (level >= 200) return 581;
+    if (level < 25) return (2 * level);
+    if (level < 50) return (5000 + (level - 25) * 225) / 100;
+    if (level < 75) return (10625 + (level - 50) * 250) / 100;
+    if (level < 100) return (16875 + (level - 75) * 275) / 100;
+    if (level < 125) return (23750 + (level - 100) * 300) / 100;
+    if (level < 150) return (31250 + (level - 125) * 325) / 100;
+    if (level < 175) return (39375 + (level - 150) * 350) / 100;
+    return (48125 + (level - 175) * 375) / 100;
   }
 
-  // function _renderBoostAttribute(string memory trait, uint256 points) internal pure returns (bytes memory) {
-  //   return abi.encodePacked('{"display_type": "boost_percentage", "trait_type": "',
-  //     trait, '", "value": ', FurLib.uint2str(((points > 100) ? (points - 100) : 0)), '},');
-  // }
-
-  function itemRarity(uint128 lootId) public pure returns(uint8) {
-    return FurLib.extractByte(lootId, 2);
-  }
-
-  function itemStat(uint128 lootId) public pure returns(uint8) {
-    return FurLib.extractByte(lootId, 1);
-  }
-
-  function _expBoosterName(uint8 rarity) internal pure returns(string memory) {
-    if (rarity == 1) return "Shoe";
-    if (rarity == 2) return "Frisbee";
-    if (rarity == 3) return "Laser Pointer";
-    require(false, 'RARITY');
-  }
-
-  function _furBoosterName(uint8 rarity) internal pure returns(string memory) {
-    if (rarity == 1) return "Fur-spray";
-    if (rarity == 2) return "Fur-tilizer";
-    if (rarity == 3) return "Fur-gaine";
-    require(false, 'RARITY');
+  /// @notice Unpacks an item, giving its rarity + stat
+  function _itemRarityStat(uint128 lootId) internal pure returns (uint8, uint8) {
+    return (FurLib.extractByte(lootId, 2), FurLib.extractByte(lootId, 1));
   }
 
   function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {

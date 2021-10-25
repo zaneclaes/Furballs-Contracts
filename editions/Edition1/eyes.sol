@@ -42,7 +42,7 @@ contract FurballsEdition1eyes is IFurballPart {
     if (idx == 1) return "Angry";
     if (idx == 2) return "Lazy";
     if (idx == 3) return "Creepy";
-    if (idx == 4) return "Monicle";
+    if (idx == 4) return "Monocle";
     if (idx == 5) return "Vapor";
     if (idx == 6) return "Skeptical Blue";
     if (idx == 7) return "Skeptical Red";

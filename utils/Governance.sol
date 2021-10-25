@@ -36,6 +36,9 @@ contract Governance is Stakeholders {
   /// @notice Where transaction fees are deposited
   address payable public treasury;
 
+  /// @notice How much is the transaction fee, in basis points?
+  uint16 public transactionFee;
+
   /// @notice Defines decimals as per ERC-20 convention to make integrations with 3rd party governance platforms easier
   uint8 public constant decimals = 0;
 
