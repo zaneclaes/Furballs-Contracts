@@ -30,9 +30,12 @@
 // - `_transferTokens()` is renamed `_beforeTokenTransfer()` and adapted to hook into OpenZeppelin's ERC721 hooks.
 pragma solidity ^0.8.6;
 
-import "../Furballs.sol";
+import "./Stakeholders.sol";
 
-contract Governance {
+contract Governance is Stakeholders {
+  /// @notice Where transaction fees are deposited
+  address payable public treasury;
+
   /// @notice Defines decimals as per ERC-20 convention to make integrations with 3rd party governance platforms easier
   uint8 public constant decimals = 0;
 
@@ -68,10 +71,13 @@ contract Governance {
   /// @notice An event thats emitted when a delegate account's vote balance changes
   event DelegateVotesChanged(address indexed delegate, uint256 previousBalance, uint256 newBalance);
 
-  Furballs public furballs;
+  constructor(address furballsAddress) Stakeholders(furballsAddress) {
+    treasury = payable(this);
+  }
 
-  constructor(address furballsAddress) {
-    furballs = Furballs(payable(furballsAddress));
+  function setTreasury(address payable treasuryAddress) external {
+    require(furballs.isAdmin(msg.sender), 'ADMIN');
+    treasury = treasuryAddress;
   }
 
   /**

@@ -9,7 +9,7 @@ import "./engines/ILootEngine.sol";
 import "./engines/EngineA.sol";
 import "./utils/FurLib.sol";
 import "./utils/FurDefs.sol";
-import "./utils/Stakeholders.sol";
+import "./utils/Moderated.sol";
 import "./utils/Governance.sol";
 import "./utils/Exp.sol";
 import "./Fur.sol";
@@ -19,7 +19,7 @@ import "./Fur.sol";
 /// @author LFG Gaming LLC
 /// @notice Mints Furballs on the Ethereum blockchain
 /// @dev https://furballs.com/contract
-contract Furballs is ERC721Enumerable, Stakeholders, Exp {
+contract Furballs is ERC721Enumerable, Moderated, Exp {
   Fur public fur;
 
   IFurballEdition[] public editions;
@@ -231,6 +231,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
       furballs[tokenId].inventory,
       reward,
       uint32(context && !isAdmin(ownerContext) ? balanceOf(ownerContext) : 0),
+      context ? furballs[tokenId].trade : 0,
       context ? age[ownerContext] : 0);
 
     // Add happiness/energy to core stats after everything else
@@ -248,7 +249,12 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
 
     FurLib.RewardModifiers memory mods = _rewardModifiers(tokenId, owner);
 
+    // Generate loot and assign to furball
+    res.loot = engine.dropLoot(uint32(res.duration / uint64(_intervalDuration)), mods);
+    if (res.loot > 0) _pickup(tokenId, res.loot);
+
     if (!FurLib.isBattleZone(mods.zone)) { // Explore!
+      fur.handleLuck(res.loot > 0, owner); // Loot drops affect the luck of the owner
       res.experience = uint32(_calculateReward(res.duration, FurLib.EXP_PER_INTERVAL, mods.expPercent));
       uint32 has = furballs[tokenId].experience;
       uint32 max = engine.maxExperience();
@@ -270,12 +276,6 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
       if (res.fur > 0) {
         fur.earn(owner, res.fur);
       }
-    }
-
-    // Generate loot and assign to furball
-    res.loot = engine.dropLoot(uint32(res.duration / uint64(_intervalDuration)), mods);
-    if (fur.handleLuck(res.loot > 0, owner)) {
-      _pickup(tokenId, res.loot);
     }
 
     // Clean the snacks as part of the transaction for good housekeeping
@@ -378,8 +378,9 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     return string(abi.encodePacked("data:application/json;base64,", FurLib.encode(abi.encodePacked(
       '{"name": "Furballs", "description": "', engine.description(),'"',
       ', "external_link": "https://furballs.com"',
+      ', "image": "https://furballs.com/images/opensea.png"',
       ', "seller_fee_basis_points": 250, "fee_recipient": "',
-      FurLib.bytesHex(abi.encodePacked(address(this))), '"}'
+      FurLib.bytesHex(abi.encodePacked(address(governance.treasury()))), '"}'
     ))));
   }
 
@@ -445,7 +446,7 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
   }
 
   function setGovernance(address addr) public onlyAdmin {
-    governance = Governance(addr);
+    governance = Governance(payable(addr));
   }
 
   function setEngine(address addr) public onlyAdmin {
@@ -474,12 +475,4 @@ contract Furballs is ERC721Enumerable, Stakeholders, Exp {
     require(msg.sender == address(engine) || isAdmin(msg.sender), 'ENG');
     _;
   }
-
-  // -----------------------------------------------------------------------------------------------
-  // Payable
-  // -----------------------------------------------------------------------------------------------
-
-  /// @notice This contract can be paid transaction fees, e.g., from OpenSea
-  /// @dev The contractURI specifies itself as the recipient of transaction fees
-  receive() external payable { }
 }

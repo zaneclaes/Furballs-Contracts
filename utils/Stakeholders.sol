@@ -3,20 +3,24 @@ pragma solidity ^0.8.6;
 
 import "./Moderated.sol";
 import "./FurLib.sol";
+import "../Furballs.sol";
 
 /// @title Stakeholders
 /// @author LFG Gaming LLC
 /// @notice Tracks "percent ownership" of a smart contract, paying out according to schedule
 abstract contract Stakeholders is Moderated {
+  Furballs public furballs;
+
   // stakeholder values, in 1/1000th of a percent (received during withdrawls)
   mapping(address => uint64) public stakes;
 
   // List of stakeholders
   address[] public stakeholders;
 
-  constructor() {
+  constructor(address furballsAddress) {
     // Start with a single stakeholder, reserving 10% for referrals.
     // setStakeholder(msg.sender, 90000);
+    furballs = Furballs(furballsAddress);
   }
 
   function getStakeholding(address addr) public view returns(uint64) {
@@ -39,7 +43,8 @@ abstract contract Stakeholders is Moderated {
     stakes[addr] = stake;
   }
 
-  function withdraw() external onlyModerators {
+  function withdraw() external {
+    require(furballs.isAdmin(msg.sender), 'ADMIN');
     uint256 balance = address(this).balance;
     require(balance >= FurLib.OneHundredPercent, "Insufficient balance");
 
@@ -62,4 +67,12 @@ abstract contract Stakeholders is Moderated {
     }
     return false;
   }
+
+  // -----------------------------------------------------------------------------------------------
+  // Payable
+  // -----------------------------------------------------------------------------------------------
+
+  /// @notice This contract can be paid transaction fees, e.g., from OpenSea
+  /// @dev The contractURI specifies itself as the recipient of transaction fees
+  receive() external payable { }
 }

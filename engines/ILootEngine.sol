@@ -33,6 +33,7 @@ interface ILootEngine is IERC165 {
     uint256[] memory inventory,
     FurLib.RewardModifiers memory baseModifiers,
     uint32 teamSize,
+    uint64 lastTradedAt,
     uint64 accountCreatedAt
   ) external view returns(FurLib.RewardModifiers memory);
 

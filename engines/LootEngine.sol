@@ -18,7 +18,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   ProxyRegistry private _proxies;
 
   constructor(address furballsAddress, address proxyRegistry) {
-    furballs = Furballs(payable(furballsAddress));
+    furballs = Furballs(furballsAddress);
     _proxies = ProxyRegistry(proxyRegistry);
   }
 
@@ -26,7 +26,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   function description() external virtual override pure returns (string memory) {
     return string(abi.encodePacked(
       "Furballs is a collectible NFT game, entirely on-chain. ",
-      "There are trillions of possible furball combinations."
+      "There are 76 billion+ possible furball combinations, plus infinite loot and surprises."
     ));
   }
 
@@ -140,6 +140,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     uint256[] memory inventory,
     FurLib.RewardModifiers memory modifiers,
     uint32 teamSize,
+    uint64 lastTradedAt,
     uint64 accountCreatedAt
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Raw/base stats
@@ -178,6 +179,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     return abi.encodePacked(
       FurLib.traitValue("Level", stats.modifiers.level),
       FurLib.traitNumber("Edition", (tokenId % 256) + 1),
+      FurLib.traitValue("Loot", stats.modifiers.weight),
       FurLib.traitValue("Rarity", stats.definition.rarity),
       FurLib.traitValue("EXP Rate", stats.expRate),
       FurLib.traitValue("FUR Rate", stats.furRate),

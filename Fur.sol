@@ -22,7 +22,7 @@ contract Fur is ERC20 {
   mapping(uint256 => FurLib.Snack[]) public _snacks;
 
   constructor(address furballsAddress) ERC20("Fur", "FUR") {
-    furballs = Furballs(payable(furballsAddress));
+    furballs = Furballs(furballsAddress);
     _mint(msg.sender, 400000);
   }
 

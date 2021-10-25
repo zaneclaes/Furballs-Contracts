@@ -56,7 +56,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   constructor(
     address furballsAddress, address paletteAddress, address[] memory partsAddresses, address[] memory pathsAddresses
   ) {
-    furballs = Furballs(payable(furballsAddress));
+    furballs = Furballs(furballsAddress);
     _palette = IFurballPalette(paletteAddress);
     for (uint256 i=0; i<partsAddresses.length; i++) {
       IFurballPart part = IFurballPart(partsAddresses[i]);
@@ -88,7 +88,8 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
         '", "external_url": "https://furballs.com/#/furball/', FurLib.bytesHex(abi.encodePacked(tokenId)),
         '", "background_color": "', _palette.backgroundColor(FurLib.extractByte(tokenId, 2)),
         '", "image": "data:image/svg+xml;base64,', FurLib.encode(_render(tokenId)),
-        '", "attributes": ', attributes,
+        '", "description": "Visit Furballs.com for the latest stats and rankings.", "attributes": ',
+        attributes,
       '}'
     );
   }
@@ -100,7 +101,11 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   }
 
   function setNames(uint256[] memory tokenIds, string[] memory names) external {
-    require(furballs.isModerator(msg.sender) || furballs.isAdmin(msg.sender));
+    require(
+      furballs.isModerator(msg.sender) ||
+      furballs.isAdmin(msg.sender) ||
+      address(furballs.engine()) == msg.sender
+    );
     require(tokenIds.length == names.length, 'LEN');
     for (uint256 i=0; i<tokenIds.length; i++) {
       _names[tokenIds[i]] = names[i];
