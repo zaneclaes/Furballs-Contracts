@@ -199,11 +199,11 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   // }
 
   function itemRarity(uint128 lootId) public pure returns(uint8) {
-    return FurLib.extractByte(lootId, 1);
+    return FurLib.extractByte(lootId, 2);
   }
 
   function itemStat(uint128 lootId) public pure returns(uint8) {
-    return FurLib.extractByte(lootId, 2);
+    return FurLib.extractByte(lootId, 1);
   }
 
   function _expBoosterName(uint8 rarity) internal pure returns(string memory) {
