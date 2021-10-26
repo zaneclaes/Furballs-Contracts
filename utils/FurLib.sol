@@ -7,8 +7,8 @@ pragma solidity ^0.8.6;
 library FurLib {
   // Key data structure given to clients for high-level furball access (furballs.stats)
   struct FurballStats {
-    uint32 expRate;
-    uint32 furRate;
+    uint16 expRate;
+    uint16 furRate;
     RewardModifiers modifiers;
     Furball definition;
     Snack[] snacks;
@@ -16,34 +16,35 @@ library FurLib {
 
   // The response from a single play session indicating rewards
   struct Rewards {
-    uint64 duration;
-    uint16 levels;
-    uint32 experience;
+    // n.b., fits within a single block of storage
+    uint32 duration;
+    uint8 levels;
+    uint16 experience;
+    uint16 fur;
     uint128 loot;
-    uint256 fur;
   }
 
   // Stored data structure in Furballs master contract which keeps track of mutable data
   struct Furball {
-    uint256 number;       // Overall number, starting with 1
+    uint32 number;        // Overall number, starting with 1
     uint32 count;         // Index within the collection
     uint32 rarity;        // Total rarity score for later boosts
     uint32 experience;    // EXP
     uint32 zone;          // When exploring, the zone number. Otherwise, battling.
     uint16 level;         // Current EXP => level; can change based on level up during collect
-    uint64 last;          // Timestamp of last action (battle/explore)
-    uint64 birth;         // Timestamp of furball creation
-    uint64 trade;         // Timestamp of last furball trading wallets
+    uint32 last;          // Timestamp of last action (battle/explore)
+    uint32 birth;         // Timestamp of furball creation
+    uint32 trade;         // Timestamp of last furball trading wallets
     uint256[] inventory;  // IDs of items in inventory
   }
 
   // A runtime-calculated set of properties that can affect Furball production during collect()
   struct RewardModifiers {
-    uint32 expPercent;
-    uint32 furPercent;
-    uint32 luckPercent;
-    uint32 happinessPoints;
-    uint32 energyPoints;
+    uint16 expPercent;
+    uint16 furPercent;
+    uint16 luckPercent;
+    uint16 happinessPoints;
+    uint16 energyPoints;
     uint32 zone;
     uint16 weight;        // Inventory size
     uint16 level;         // Starting level (at beginning of collection cycle)
@@ -54,11 +55,11 @@ library FurLib {
   struct Snack {
     uint32 snackId;       // Unique ID
     uint32 duration;      // Time it lasts, seconds
-    uint32 furCost;       // How much FUR
+    uint16 furCost;       // How much FUR
     uint16 happiness;     // +happiness bost points
     uint16 energy;        // +energy boost points
-    uint32 count;         // How many in stack?
-    uint64 fed;           // When was it fed (if it is active)?
+    uint16 count;         // How many in stack?
+    uint32 fed;           // When was it fed (if it is active)?
   }
 
   uint32 public constant Max32 = type(uint32).max;
@@ -95,10 +96,6 @@ library FurLib {
 
   function extractByte(uint256 tokenId, uint8 byteNum) internal pure returns(uint8) {
     return uint8((tokenId / (256 ** uint256(byteNum))) % 256);
-  }
-
-  function isBattleZone(uint32 zone) internal pure returns(bool) {
-    return zone >= 0x10000;
   }
 
   function bytesHex(bytes memory data) internal pure returns(string memory) {

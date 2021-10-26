@@ -15,7 +15,7 @@ interface IFurballEdition is IERC165 {
   function numSlots() external view returns(uint8);
   function numParts(uint8 slot) external view returns(uint8);
 
-  function liveAt() external view returns(uint64);
+  function liveAt() external view returns(uint32);
   function minted(address addr) external view returns(uint32);
   function maxMintable(address addr) external view returns(uint32);
 
@@ -24,13 +24,8 @@ interface IFurballEdition is IERC165 {
 
   function spawn() external returns (uint256, uint32);
 
-  /// @notice Calculates the effects of the loot in a Furball's inventory
-  function modifyReward(
-    uint256 tokenId, FurLib.RewardModifiers memory modifiers
-  ) external view returns(FurLib.RewardModifiers memory);
-
   /// @notice Renders a JSON object for tokenURI
   function tokenMetadata(
-    uint256 tokenId, uint256 number, uint64 birth, uint64 trade, uint64 moved
+    uint256 tokenId, uint256 number, uint32 birth, uint32 trade, uint32 moved
   ) external view returns(bytes memory);
 }

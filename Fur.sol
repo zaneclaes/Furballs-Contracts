@@ -40,26 +40,27 @@ contract Fur is ERC20 {
   }
 
   /// @notice Write-function to cleanup the snacks for a token (remove expired)
-  function cleanSnacks(uint256 tokenId) public {
-    _cleanSnack(tokenId, 0);
+  function cleanSnacks(uint256 tokenId) public returns (uint16, uint16) {
+    (uint256 existingSnackNumber, uint16 hap, uint16 en) = _cleanSnack(tokenId, 0);
+    return (hap, en);
   }
 
   /// @notice The public accessor calculates the snack boosts
-  function modifyReward(
-    uint256 tokenId, FurLib.RewardModifiers memory modifiers
-  ) external view returns(FurLib.RewardModifiers memory) {
+  function snackEffects(uint256 tokenId) external view returns(uint16, uint16) {
     // Add to base luck percent stat with the bad luck of the owner
     address owner = furballs.ownerOf(tokenId);
+    uint16 hap = 0;
+    uint16 en = 0;
 
     for (uint32 i=0; i<_snacks[tokenId].length && i <= FurLib.Max32; i++) {
       uint256 remaining = _snackTimeRemaning(_snacks[tokenId][i]);
       if (remaining > 0) {
-        modifiers.happinessPoints += _snacks[tokenId][i].happiness;
-        modifiers.energyPoints += _snacks[tokenId][i].energy;
+        hap += _snacks[tokenId][i].happiness;
+        en += _snacks[tokenId][i].energy;
       }
     }
 
-    return modifiers;
+    return (hap, en);
   }
 
   /// @notice Pay any necessary fees to mint a furball
@@ -84,15 +85,15 @@ contract Fur is ERC20 {
   /// @notice Attempts to purchase an upgrade for a loot item
   /// @dev Delegated logic from Furballs
   function purchaseUpgrade(
-    address from, uint256 tokenId, uint128 lootId, uint8 chances,
-    FurLib.RewardModifiers memory modifiers
+    FurLib.RewardModifiers memory modifiers,
+    address from, uint256 tokenId, uint128 lootId, uint8 chances
   ) external onlyGame returns(uint128) {
     address owner = furballs.ownerOf(tokenId);
 
     // _gift will throw if cannot gift or cannot afford cost
     _gift(from, owner, 10000 * uint256(chances));
 
-    return furballs.engine().upgradeLoot(owner, lootId, chances, modifiers);
+    return furballs.engine().upgradeLoot(modifiers, owner, lootId, chances);
   }
 
   /// @notice Attempts to purchase a snack using templates found in the engine
@@ -107,14 +108,14 @@ contract Fur is ERC20 {
     // _gift will throw if cannot gift or cannot afford costQ
     _gift(from, furballs.ownerOf(tokenId), snack.furCost * count);
 
-    uint256 existingSnackNumber = _cleanSnack(tokenId, snack.snackId);
+    (uint256 existingSnackNumber, uint16 hap, uint16 en) = _cleanSnack(tokenId, snack.snackId);
     snack.count *= count;
     if (existingSnackNumber > 0) {
       // Adding count effectively adds duration to the active snack
       _snacks[tokenId][existingSnackNumber - 1].count += snack.count;
     } else {
       // A new snack just gets pushed onto the array
-      snack.fed = uint64(block.timestamp);
+      snack.fed = uint32(block.timestamp);
       _snacks[tokenId].push(snack);
     }
   }
@@ -122,11 +123,14 @@ contract Fur is ERC20 {
   /// @notice Both removes inactive _snacks from a token and searches for a specific snack Id index
   /// @dev Both at once saves some size & ensures that the _snacks are frequently cleaned.
   /// @return The index+1 of the existing snack
-  function _cleanSnack(uint256 tokenId, uint32 snackId) internal returns(uint256) {
+  function _cleanSnack(uint256 tokenId, uint32 snackId) internal returns(uint256, uint16, uint16) {
     uint256 ret = 0;
+    uint16 hap = 0;
+    uint16 en = 0;
     for (uint32 i=1; i<=_snacks[tokenId].length && i <= FurLib.Max32; i++) {
+      FurLib.Snack memory snack = _snacks[tokenId][i-1];
       // Has the snack transitioned from active to inactive?
-      if (_snackTimeRemaning(_snacks[tokenId][i-1]) == 0) {
+      if (_snackTimeRemaning(snack) == 0) {
         if (_snacks[tokenId].length > 1) {
           _snacks[tokenId][i-1] = _snacks[tokenId][_snacks[tokenId].length - 1];
         }
@@ -134,11 +138,13 @@ contract Fur is ERC20 {
         i--; // Repeat this idx
         continue;
       }
-      if (snackId != 0 && _snacks[tokenId][i-1].snackId == snackId) {
+      hap += snack.happiness;
+      en += snack.energy;
+      if (snackId != 0 && snack.snackId == snackId) {
         ret = i;
       }
     }
-    return (ret);
+  return (ret, hap, en);
   }
 
   /// @notice Check if the snack is active; returns 0 if inactive, otherwise the duration

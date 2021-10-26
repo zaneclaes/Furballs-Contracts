@@ -77,10 +77,10 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
   /// @notice Attempt to upgrade a given piece of loot (item ID)
   function upgradeLoot(
+    FurLib.RewardModifiers memory modifiers,
     address owner,
     uint128 lootId,
-    uint8 chances,
-    FurLib.RewardModifiers memory modifiers
+    uint8 chances
   ) external virtual override returns(uint128) {
     (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
 
@@ -100,7 +100,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     FurLib.RewardModifiers memory modifiers
   ) external virtual override onlyFurballs returns(uint128) {
     // Only battles drop loot.
-    if (FurLib.isBattleZone(modifiers.zone)) return 0;
+    if (modifiers.zone >= 0x10000) return 0;
     if (modifiers.weight >= 50) return 0;
 
     (uint8 rarity, uint8 stat) = rollRarityStat(
@@ -151,8 +151,8 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     uint256[] memory inventory,
     FurLib.RewardModifiers memory modifiers,
     uint32 teamSize,
-    uint64 lastTradedAt,
-    uint64 accountCreatedAt
+    uint32 lastTradedAt,
+    uint32 accountCreatedAt
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Raw/base stats
     modifiers.furPercent += _furBoost(modifiers.level);
@@ -162,7 +162,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
       uint128 lootId = uint128(inventory[i] / 256);
       uint32 stackSize = uint32(inventory[i] % 256);
       (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
-      uint32 boost = uint32(rarity * stackSize * 5);
+      uint16 boost = uint16(rarity * stackSize * 5);
       if (stat == 0) {
         modifiers.expPercent += boost;
       } else {
@@ -172,11 +172,11 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
     // Reward players for holding, but also punish the whales...
     if (teamSize < 10 && teamSize > 1) {
-      uint32 amt = uint32(2 * (teamSize - 1));
+      uint16 amt = uint16(2 * (teamSize - 1));
       modifiers.expPercent += amt;
       modifiers.furPercent += amt;
     } else if (teamSize > 10) {
-      uint32 amt = uint32(5 * (teamSize > 20 ? 10 : (teamSize - 10)));
+      uint16 amt = uint16(5 * (teamSize > 20 ? 10 : (teamSize - 10)));
       modifiers.expPercent -= amt;
       modifiers.furPercent -= amt;
     }
@@ -202,7 +202,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   }
 
   /// @notice Gets the FUR boost for a given level
-  function _furBoost(uint32 level) internal pure returns (uint32) {
+  function _furBoost(uint16 level) internal pure returns (uint16) {
     if (level >= 200) return 581;
     if (level < 25) return (2 * level);
     if (level < 50) return (5000 + (level - 25) * 225) / 100;

@@ -17,7 +17,7 @@ import "./IFurballPalette.sol";
 /// @notice Base class for a furball edition with common implementations
 abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   // The time at which this edition goes live
-  uint64 public override liveAt = 0;
+  uint32 public override liveAt = 0;
 
   // How many exist in this edition?
   uint32 public override count = 0;
@@ -49,12 +49,6 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   Furballs public furballs;
 
-  function modifyReward(
-    uint256 tokenId, FurLib.RewardModifiers memory modifiers
-  ) external override virtual view returns(FurLib.RewardModifiers memory) {
-    return modifiers;
-  }
-
   constructor(
     address furballsAddress, address paletteAddress, address[] memory partsAddresses, address[] memory pathsAddresses
   ) {
@@ -75,7 +69,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   /// @notice Metadata loader
   function tokenMetadata(
-    uint256 tokenId, uint256 number, uint64 birth, uint64 trade, uint64 moved
+    uint256 tokenId, uint256 number, uint32 birth, uint32 trade, uint32 moved
   ) external virtual override view returns(bytes memory) {
     bytes memory attributes = abi.encodePacked(
       '[',
@@ -136,7 +130,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     return _parts[slots[slot]].count();
   }
 
-  function setLiveAt(uint64 at) public onlyAdmin {
+  function setLiveAt(uint32 at) public onlyAdmin {
     liveAt = at;
   }
 

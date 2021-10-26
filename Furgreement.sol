@@ -14,6 +14,10 @@ contract Furgreement is EIP712 {
 
   mapping(address => uint256) private nonces;
 
+  address[] public addressQueue;
+
+  mapping(address => PlayMove) public pendingMoves;
+
   // A "move to be made" in the sig queue
   struct PlayMove {
     uint32 zone;
@@ -46,38 +50,9 @@ contract Furgreement is EIP712 {
     require(block.timestamp < deadline, "playMany: signed transaction expired");
     nonces[owner]++;
 
-    furballs.playMany(move.tokenIds, move.zone, owner);
+    if (pendingMoves[owner].tokenIds.length == 0) {
+      addressQueue.push(owner);
+    }
+    pendingMoves[owner] = move;
   }
 }
-
-// interface Comp {
-//   function delegateBySig(
-//     address delegatee,
-//     uint nonce,
-//     uint expiry,
-//     uint8 v,
-//     bytes32 r,
-//     bytes32 s
-//   ) external;
-// }
-
-// contract FurDelegate {
-//   struct Furgreement {
-
-//     // address delegatee;
-//     // uint nonce;
-//     // uint expiry;
-//     // uint8 v;
-//     // bytes32 r;
-//     // bytes32 s;
-//   }
-
-//   // function delegateBySigs(Furgreement[] memory sigs) public {
-//   //   Comp comp = Comp(0xc00e94Cb662C3520282E6f5717214004A7f26888);
-
-//   //   for (uint i = 0; i < sigs.length; i++) {
-//   //     Furgreement memory sig = sigs[i];
-//   //     comp.delegateBySig(sig.delegatee, sig.nonce, sig.expiry, sig.v, sig.r, sig.s);
-//   //   }
-//   // }
-// }

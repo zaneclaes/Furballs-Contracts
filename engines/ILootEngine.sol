@@ -23,10 +23,10 @@ interface ILootEngine is IERC165 {
 
   /// @notice Players can pay to re-roll their loot drop on a Furball
   function upgradeLoot(
+    FurLib.RewardModifiers memory modifiers,
     address owner,
     uint128 lootId,
-    uint8 chances,
-    FurLib.RewardModifiers memory modifiers
+    uint8 chances
   ) external returns(uint128);
 
   /// @notice Some zones may have preconditions
@@ -37,8 +37,8 @@ interface ILootEngine is IERC165 {
     uint256[] memory inventory,
     FurLib.RewardModifiers memory baseModifiers,
     uint32 teamSize,
-    uint64 lastTradedAt,
-    uint64 accountCreatedAt
+    uint32 lastTradedAt,
+    uint32 accountCreatedAt
   ) external view returns(FurLib.RewardModifiers memory);
 
   /// @notice JSON object for displaying metadata on OpenSea, etc.
