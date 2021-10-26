@@ -75,13 +75,14 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   /// @notice Metadata loader
   function tokenMetadata(
-    uint256 tokenId, uint256 number, uint64 birth, uint64 trade
+    uint256 tokenId, uint256 number, uint64 birth, uint64 trade, uint64 moved
   ) external virtual override view returns(bytes memory) {
     bytes memory attributes = abi.encodePacked(
       '[',
         furballs.engine().attributesMetadata(tokenId),
         _getAttributes(tokenId),
-        '{"display_type": "date", "trait_type": "Acquired", "value": ', FurLib.uint2str(trade),
+        '{"display_type": "date", "trait_type": "Last Move", "value": ', FurLib.uint2str(moved),
+        '}, {"display_type": "date", "trait_type": "Acquired", "value": ', FurLib.uint2str(trade),
         '}, {"display_type": "date", "trait_type": "Birthday", "value": ', FurLib.uint2str(birth),
       '}]'
     );

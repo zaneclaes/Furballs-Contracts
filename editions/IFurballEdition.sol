@@ -31,6 +31,6 @@ interface IFurballEdition is IERC165 {
 
   /// @notice Renders a JSON object for tokenURI
   function tokenMetadata(
-    uint256 tokenId, uint256 number, uint64 birth, uint64 trade
+    uint256 tokenId, uint256 number, uint64 birth, uint64 trade, uint64 moved
   ) external view returns(bytes memory);
 }
