@@ -9,13 +9,13 @@ import "hardhat/console.sol";
 /// @author LFG Gaming LLC
 /// @notice Concrete implentation of the first Furball edition
 contract Edition1 is FurballEdition {
-  uint32 public override maxCount = 7500;
-  uint32 public override maxAdoptable = 2500;
+  uint16 public override maxCount = 7500;
+  uint16 public override maxAdoptable = 2500;
 
   constructor(address fa, address paletteAddress, address[] memory pa, address[] memory pathsAddresses)
     FurballEdition(fa, paletteAddress, pa, pathsAddresses) { }
 
-  function maxMintable(address addr) external virtual override view returns(uint32) {
+  function maxMintable(address addr) external virtual override view returns(uint16) {
     bool withFur = count >= maxAdoptable;
     if (furballs.isAdmin(addr)) {
       return withFur ? 75 : 50;

@@ -151,8 +151,8 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     uint256[] memory inventory,
     FurLib.RewardModifiers memory modifiers,
     uint32 teamSize,
-    uint32 lastTradedAt,
-    uint32 accountCreatedAt
+    uint64 lastTradedAt,
+    uint64 accountCreatedAt
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Raw/base stats
     modifiers.furPercent += _furBoost(modifiers.level);
@@ -190,14 +190,21 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   ) external virtual override view returns(bytes memory) {
     FurLib.FurballStats memory stats = furballs.stats(tokenId, false);
     return abi.encodePacked(
-      FurLib.traitValue("Level", stats.modifiers.level),
-      FurLib.traitNumber("Edition", (tokenId % 256) + 1),
-      FurLib.traitValue("Loot", stats.modifiers.weight),
-      FurLib.traitValue("Rarity", stats.definition.rarity),
-      FurLib.traitValue("EXP Rate", stats.expRate),
-      FurLib.traitValue("FUR Rate", stats.furRate),
-      FurLib.traitBoost("EXP", stats.modifiers.expPercent),
-      FurLib.traitBoost("FUR", stats.modifiers.furPercent)
+      abi.encodePacked(
+        FurLib.traitValue("Level", stats.modifiers.level),
+        FurLib.traitNumber("Edition", (tokenId % 256) + 1),
+        FurLib.traitValue("Loot", stats.definition.inventory.length),
+        FurLib.traitValue("Rarity", stats.definition.rarity),
+        FurLib.traitValue("EXP Rate", stats.expRate),
+        FurLib.traitValue("FUR Rate", stats.furRate),
+        FurLib.traitBoost("EXP Boost", stats.modifiers.expPercent),
+        FurLib.traitBoost("FUR Boost", stats.modifiers.furPercent),
+        FurLib.traitDate("Last Move", stats.definition.last)
+      ),
+      abi.encodePacked(
+        FurLib.traitDate("Acquired", stats.definition.trade),
+        FurLib.traitDate("Birthday", stats.definition.birth)
+      )
     );
   }
 

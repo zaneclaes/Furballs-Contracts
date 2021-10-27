@@ -17,22 +17,22 @@ import "./IFurballPalette.sol";
 /// @notice Base class for a furball edition with common implementations
 abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   // The time at which this edition goes live
-  uint32 public override liveAt = 0;
+  uint64 public override liveAt = 0;
 
   // How many exist in this edition?
-  uint32 public override count = 0;
+  uint16 public override count = 0;
 
   // The names of the slots used by this edition
   string[] public slots;
 
   // How many has each wallet minted in this edition?
-  mapping(address => uint32) public override minted;
+  mapping(address => uint16) public override minted;
 
   mapping(string => IFurballPart) private _parts;
 
   IFurballPalette private _palette;
 
-  mapping(address => uint32) internal _whitelist;
+  mapping(address => uint16) internal _whitelist;
 
   mapping(uint256 => string) public names;
 
@@ -48,6 +48,12 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   ];
 
   Furballs public furballs;
+
+  function modifyReward(
+    FurLib.RewardModifiers memory modifiers, uint256 tokenId
+  ) external override virtual view returns(FurLib.RewardModifiers memory) {
+    return modifiers;
+  }
 
   constructor(
     address furballsAddress, address paletteAddress, address[] memory partsAddresses, address[] memory pathsAddresses
@@ -69,26 +75,16 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   /// @notice Metadata loader
   function tokenMetadata(
-    uint256 tokenId, uint256 number, uint32 birth, uint32 trade, uint32 moved
+    bytes memory attributes, uint256 tokenId, uint256 number
   ) external virtual override view returns(bytes memory) {
-    bytes memory attributes = abi.encodePacked(
-      '[',
-        furballs.engine().attributesMetadata(tokenId),
-        _getAttributes(tokenId),
-        '{"display_type": "date", "trait_type": "Last Move", "value": ', FurLib.uint2str(moved),
-        '}, {"display_type": "date", "trait_type": "Acquired", "value": ', FurLib.uint2str(trade),
-        '}, {"display_type": "date", "trait_type": "Birthday", "value": ', FurLib.uint2str(birth),
-      '}]'
-    );
-
     return abi.encodePacked(
       '{"name": "', _nameOf(tokenId, number),
         '", "external_url": "https://furballs.com/#/furball/', FurLib.bytesHex(abi.encodePacked(tokenId)),
         '", "background_color": "', _palette.backgroundColor(FurLib.extractByte(tokenId, 2)),
         '", "image": "data:image/svg+xml;base64,', FurLib.encode(_render(tokenId)),
         '", "description": "', _descriptionOf(tokenId),'", "attributes": ',
-        attributes,
-      '}'
+        '[', attributes, _getAttributes(tokenId),
+      ']}'
     );
   }
 
@@ -115,7 +111,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
       "Visit Furballs.com for the latest stats and rankings.";
   }
 
-  function addCount(address to, uint32 amount) external override returns(bool) {
+  function addCount(address to, uint16 amount) external override returns(bool) {
     require(furballs.isAdmin(msg.sender) || msg.sender == address(furballs));
     count += amount;
     minted[to] += amount;
@@ -130,11 +126,11 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     return _parts[slots[slot]].count();
   }
 
-  function setLiveAt(uint32 at) public onlyAdmin {
+  function setLiveAt(uint64 at) public onlyAdmin {
     liveAt = at;
   }
 
-  function addToWhitelist(address[] memory addresses, uint32 num) public onlyAdmin {
+  function addToWhitelist(address[] memory addresses, uint16 num) public onlyAdmin {
     for (uint256 i=0; i<addresses.length; i++) {
       _whitelist[addresses[i]] = num;
     }
@@ -142,33 +138,31 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   function _getAttributes(uint256 tokenId) internal virtual view returns (string memory) {
     bytes memory ret = "";
-    // abi.encodePacked(
-    //     '{"display_type": "boost_percentage", "trait_type": "Rarity", "value": ',
-    //     FurLib.uint2str(boost),'},');
+    bool added = false;
     for (uint8 slot=0; slot<slots.length; slot++) {
       uint8 idx = _extractSlotNumber(tokenId, slot);
       if (idx == 0) continue;
       idx--;
 
-      ret = abi.encodePacked(ret, FurLib.trait(slots[slot],
-        string(abi.encodePacked(
-          _parts[slots[slot]].name(idx),
-          FurDefs.raritySuffix(_getRarity(slot, idx))
-        ))
-      ));
+      ret = abi.encodePacked(ret,
+        added ? ', ' : '',
+        '{"trait_type": "', slots[slot], '", "value": "',
+        _parts[slots[slot]].name(idx), FurDefs.raritySuffix(_getRarity(slot, idx)), '"}'
+      );
+      added = true;
     }
     return string(ret);
   }
 
-  function spawn() external override returns (uint256, uint32) {
+  function spawn() external override returns (uint256, uint16) {
     uint8 palette = uint8(roll(0) % _palette.numPalettes());
     uint8 bk = uint8(roll(0) % _palette.numBackgroundColors());
     uint256 tokenId = (bk * (256 ** 2)) + (palette * 256);
-    uint32 boost = 0;
+    uint16 boost = 0;
     for (uint8 slot=0; slot<slots.length; slot++) {
       (uint256 id, uint8 rarity) = rollSlot(0, slot, 0);
       tokenId += id * (256 ** (slot + 3));
-      boost += uint32(rarity * 5);
+      boost += uint16(rarity) * 5;
     }
     return (tokenId, boost);
   }

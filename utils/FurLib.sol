@@ -4,6 +4,7 @@ pragma solidity ^0.8.6;
 /// @title FurLib
 /// @author LFG Gaming LLC
 /// @notice Utilities for Furballs
+/// @dev Each of the structs are designed to fit within 256
 library FurLib {
   // Key data structure given to clients for high-level furball access (furballs.stats)
   struct FurballStats {
@@ -16,25 +17,24 @@ library FurLib {
 
   // The response from a single play session indicating rewards
   struct Rewards {
-    // n.b., fits within a single block of storage
     uint32 duration;
-    uint8 levels;
-    uint16 experience;
-    uint16 fur;
+    uint16 levels;
+    uint32 experience;
+    uint32 fur;
     uint128 loot;
   }
 
   // Stored data structure in Furballs master contract which keeps track of mutable data
   struct Furball {
     uint32 number;        // Overall number, starting with 1
-    uint32 count;         // Index within the collection
-    uint32 rarity;        // Total rarity score for later boosts
+    uint16 count;         // Index within the collection
+    uint16 rarity;        // Total rarity score for later boosts
     uint32 experience;    // EXP
     uint32 zone;          // When exploring, the zone number. Otherwise, battling.
     uint16 level;         // Current EXP => level; can change based on level up during collect
-    uint32 last;          // Timestamp of last action (battle/explore)
-    uint32 birth;         // Timestamp of furball creation
-    uint32 trade;         // Timestamp of last furball trading wallets
+    uint64 birth;         // Timestamp of furball creation
+    uint64 trade;         // Timestamp of last furball trading wallets
+    uint64 last;          // Timestamp of last action (battle/explore)
     uint256[] inventory;  // IDs of items in inventory
   }
 
@@ -74,24 +74,37 @@ library FurLib {
     return abi.encodePacked('{"trait_type": "', traitType,'", "value": "', value, '"}, ');
   }
 
+  function traitNumberDisplay(
+    string memory traitType, string memory displayType, uint256 value
+  ) internal pure returns (bytes memory) {
+    return abi.encodePacked(
+      '{"trait_type": "', traitType,
+      bytes(displayType).length > 0 ? '", "display_type": "' : '', displayType,
+      '", "value": ', uint2str(value), '}, '
+    );
+  }
+
   function traitValue(string memory traitType, uint256 value) internal pure returns (bytes memory) {
-    return abi.encodePacked('{"trait_type": "', traitType,'", "value": ', uint2str(value), '}, ');
+    return traitNumberDisplay(traitType, "", value);
   }
 
   /// @notice Convert a modifier percentage (120%) into a metadata +20% boost
   function traitBoost(
     string memory traitType, uint256 percent
   ) internal pure returns (bytes memory) {
-    return abi.encodePacked('{"trait_type": "', traitType,
-      ' Boost", "display_type": "boost_percentage", "value": ',
-      uint2str(percent > 100 ? (percent - 100) : 0), '}, ');
+    return traitNumberDisplay(traitType, "boost_percentage", percent > 100 ? (percent - 100) : 0);
   }
 
   function traitNumber(
     string memory traitType, uint256 value
   ) internal pure returns (bytes memory) {
-    return abi.encodePacked('{"trait_type": "', traitType,
-      '", "display_type": "number", "value": ', uint2str(value), '}, ');
+    return traitNumberDisplay(traitType, "number", value);
+  }
+
+  function traitDate(
+    string memory traitType, uint256 value
+  ) internal pure returns (bytes memory) {
+    return traitNumberDisplay(traitType, "number", value);
   }
 
   function extractByte(uint256 tokenId, uint8 byteNum) internal pure returns(uint8) {
