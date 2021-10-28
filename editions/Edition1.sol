@@ -23,7 +23,7 @@ contract Edition1 is FurballEdition {
     if (liveAt == 0 || liveAt > uint64(block.timestamp)) {
       return _whitelist[addr];
     }
-    return withFur ? 15 : 5;
+    return withFur ? 9 : 5;
   }
 
   function purchaseFur() public override view returns(uint256) {
