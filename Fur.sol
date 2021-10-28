@@ -89,6 +89,7 @@ contract Fur is ERC20 {
     address from, uint256 tokenId, uint128 lootId, uint8 chances
   ) external onlyGame returns(uint128) {
     address owner = furballs.ownerOf(tokenId);
+    require(chances <= 10 && chances > 0, 'CHANCE');
 
     // _gift will throw if cannot gift or cannot afford cost
     _gift(from, owner, 10000 * uint256(chances));
@@ -150,7 +151,8 @@ contract Fur is ERC20 {
   /// @notice Check if the snack is active; returns 0 if inactive, otherwise the duration
   function _snackTimeRemaning(FurLib.Snack memory snack) internal view returns(uint256) {
     if (snack.fed == 0) return 0;
-    uint256 expiresAt = uint256(snack.fed + (snack.count * snack.duration));
+    uint256 interval = furballs.intervalDuration();
+    uint256 expiresAt = uint256(snack.fed + (snack.count * snack.duration * interval));
     return expiresAt <= block.timestamp ? 0 : (expiresAt - block.timestamp);
   }
 
