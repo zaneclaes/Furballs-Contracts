@@ -10,7 +10,7 @@ pragma solidity ^0.8.6;
 abstract contract Exp {
   /// @notice Calculates current level based upon EXP
   /// @dev Levels are triangular numbers; this function reverses the equation.
-  function expToLevel(uint32 exp, uint32 maxExp) public view returns(uint16) {
+  function expToLevel(uint32 exp, uint32 maxExp) public pure returns(uint16) {
     return _sqrt(_exp(exp > maxExp ? maxExp : exp));
   }
 

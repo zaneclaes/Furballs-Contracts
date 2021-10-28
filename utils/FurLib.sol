@@ -54,7 +54,7 @@ library FurLib {
   // For sale via loot engine.
   struct Snack {
     uint32 snackId;       // Unique ID
-    uint32 duration;      // Time it lasts, seconds
+    uint32 duration;      // How long it lasts, !expressed in intervals!
     uint16 furCost;       // How much FUR
     uint16 happiness;     // +happiness bost points
     uint16 energy;        // +energy boost points

@@ -41,10 +41,10 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
   mapping(uint256 => FurLib.Rewards[]) public collect;
 
   // When did this address get its first furball?
-  mapping(address => uint64) public age;
+  mapping(address => uint64) private age;
 
-  // The amount of time over which FUR/EXP is accrued (usually 360=>1hour)
-  uint256 private _intervalDuration;
+  // The amount of time over which FUR/EXP is accrued (usually 3600=>1hour)
+  uint256 public intervalDuration;
 
   event Spawn(uint8 editionIndex, uint32 editionCount);
   event Play(uint256 tokenId, uint256 responseId);
@@ -52,7 +52,7 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
   event Drop(uint256 tokenId, uint128 lootId, uint32 count);
 
   constructor(uint256 interval) ERC721("Furballs", "FBL") {
-    _intervalDuration = interval;
+    intervalDuration = interval;
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -159,7 +159,7 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
   // Internal
   // -----------------------------------------------------------------------------------------------
 
-  function _slotNum(uint256 tokenId, uint128 lootId) internal returns(uint256) {
+  function _slotNum(uint256 tokenId, uint128 lootId) internal view returns(uint256) {
     for (uint8 i=0; i<furballs[tokenId].inventory.length; i++) {
       if (furballs[tokenId].inventory[i] / 256 == lootId) {
         return i + 1;
@@ -299,7 +299,7 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
     }
 
     // Generate loot and assign to furball
-    uint32 interval = uint32(_intervalDuration);
+    uint32 interval = uint32(intervalDuration);
     res.loot = engine.dropLoot(res.duration / interval, mods);
     if (res.loot > 0) _pickup(tokenId, res.loot);
 
@@ -381,8 +381,8 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
         contextual ? en : 0);
 
     return FurLib.FurballStats(
-      uint16(_calculateReward(_intervalDuration, FurLib.EXP_PER_INTERVAL, mods.expPercent)),
-      uint16(_calculateReward(_intervalDuration, FurLib.FUR_PER_INTERVAL, mods.furPercent)),
+      uint16(_calculateReward(intervalDuration, FurLib.EXP_PER_INTERVAL, mods.expPercent)),
+      uint16(_calculateReward(intervalDuration, FurLib.FUR_PER_INTERVAL, mods.furPercent)),
       mods,
       furballs[tokenId],
       fur.snacks(tokenId)
@@ -393,7 +393,7 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
   function _calculateReward(
     uint256 duration, uint256 perInterval, uint256 percentBoost
   ) internal view returns(uint256) {
-    uint256 interval = _intervalDuration;
+    uint256 interval = intervalDuration;
     return (duration * percentBoost * perInterval) / (100 * interval);
   }
 
