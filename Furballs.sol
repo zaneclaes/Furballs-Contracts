@@ -74,21 +74,26 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
 
   /// @notice Feeds the furball a snack
   /// @dev Delegates logic to fur
-  function feed(uint256 tokenId, uint32 snackId, uint16 count, address actor) external {
-    fur.purchaseSnack(_approvedSender(actor), tokenId, snackId, count);
+  function feed(uint256 tokenId, uint32[] memory snackIds, uint16[] memory counts, address actor) external {
+    require(snackIds.length == counts.length, 'SIZE');
+    address sender = _approvedSender(actor);
+
+    for (uint256 i=0; i<snackIds.length; i++) {
+      fur.purchaseSnack(sender, tokenId, snackIds[i], counts[i]);
+    }
   }
 
   /// @notice Begins battle/explore modes by changing zones & collecting rewards
   /// @dev See also: playMany
-  function playOne(uint256 tokenId, uint32 zone) external {
-    uint256[] memory team;
+  // function playOne(uint256 tokenId, uint32 zone) external {
+  //   uint256[] memory team;
 
-    // Run reward collection
-    _collect(tokenId, _approvedSender(address(0)));
+  //   // Run reward collection
+  //   _collect(tokenId, _approvedSender(address(0)));
 
-    // Set new zone (if allowed; enterZone may throw)
-    furballs[tokenId].zone = uint32(engine.enterZone(tokenId, zone, team));
-  }
+  //   // Set new zone (if allowed; enterZone may throw)
+  //   furballs[tokenId].zone = uint32(engine.enterZone(tokenId, zone, team));
+  // }
 
   /// @notice Begins exploration mode with the given furballs
   /// @dev Multiple furballs accepted at once to reduce gas fees
@@ -111,7 +116,7 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
   /// @param lootId The lootId in its inventory to re-roll
   function upgrade(
     uint256 tokenId, uint128 lootId, uint8 chances, address actor
-  ) external returns(uint128) {
+  ) external {
     // Attempt upgrade (random chance).
     uint128 up = fur.purchaseUpgrade(
       _baseModifiers(tokenId), _approvedSender(actor), tokenId, lootId, chances);
@@ -119,7 +124,6 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
       _drop(tokenId, lootId, 1);
       _pickup(tokenId, up);
     }
-    return up;
   }
 
   /// @notice The LootEngine can directly send loot to a furball!

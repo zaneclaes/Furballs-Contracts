@@ -115,7 +115,7 @@ contract Fur is ERC20 {
       _snacks[tokenId][existingSnackNumber - 1].count += snack.count;
     } else {
       // A new snack just gets pushed onto the array
-      snack.fed = uint32(block.timestamp);
+      snack.fed = uint64(block.timestamp);
       _snacks[tokenId].push(snack);
     }
   }
@@ -144,7 +144,7 @@ contract Fur is ERC20 {
         ret = i;
       }
     }
-  return (ret, hap, en);
+    return (ret, hap, en);
   }
 
   /// @notice Check if the snack is active; returns 0 if inactive, otherwise the duration

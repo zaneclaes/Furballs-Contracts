@@ -59,7 +59,7 @@ library FurLib {
     uint16 happiness;     // +happiness bost points
     uint16 energy;        // +energy boost points
     uint16 count;         // How many in stack?
-    uint32 fed;           // When was it fed (if it is active)?
+    uint64 fed;           // When was it fed (if it is active)?
   }
 
   uint32 public constant Max32 = type(uint32).max;

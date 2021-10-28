@@ -130,17 +130,17 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     if (snackId % 256 == 0) {
       uint8 snackSize = uint8((snackId / 256) % 256);
       if (snackSize == 1) {
-        snack.duration = 8 * 360;
+        snack.duration = 24 * 3600;
         snack.happiness = 15;
-        snack.furCost = 100;
+        snack.furCost = 250;
       } else if (snackSize == 2) {
-        snack.duration = 24 * 360;
+        snack.duration = 72 * 3600;
         snack.happiness = 20;
-        snack.furCost = 300;
+        snack.furCost = 750;
       } else if (snackSize == 3) {
-        snack.duration = 72 * 360;
+        snack.duration = 24 * 3600 * 7;
         snack.happiness = 25;
-        snack.furCost = 900;
+        snack.furCost = 1500;
       }
     }
     return snack;

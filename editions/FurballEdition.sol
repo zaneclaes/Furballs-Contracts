@@ -162,7 +162,9 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     for (uint8 slot=0; slot<slots.length; slot++) {
       (uint256 id, uint8 rarity) = rollSlot(0, slot, 0);
       tokenId += id * (256 ** (slot + 3));
-      boost += uint16(rarity) * 5;
+      if(rarity > 0) {
+        boost += uint16(rarity + 1) * 5;
+      }
     }
     return (tokenId, boost);
   }
