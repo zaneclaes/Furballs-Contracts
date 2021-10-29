@@ -22,17 +22,9 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     _proxies = ProxyRegistry(proxyRegistry);
   }
 
-  /// @notice Hardcoded description for OpenSea
-  function name() external virtual override pure returns (string memory) {
-    return "Furballs";
-  }
-
-  /// @notice Hardcoded description for OpenSea
-  function description() external virtual override pure returns (string memory) {
-    return string(abi.encodePacked(
-      "Furballs is a collectible NFT game, entirely on-chain. ",
-      "There are 76 billion+ possible furball combinations, plus infinite loot and surprises."
-    ));
+  /// @notice Loot can have different weight to help prevent over-powering a furball
+  function weightOf(uint128 lootId) external virtual override pure returns (uint16) {
+    return 1;
   }
 
   /// @notice maxExperience is simply hardcoded for now.
@@ -65,7 +57,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     // Ensure the sender is a wallet, or that it is an approved proxy
     uint256 size;
     assembly { size := extcodesize(sender) }
-    require(sender == tx.origin && size == 0, 'PLR');
+    require(sender == tx.origin && size == 0, "PLR");
 
     return sender;
   }
@@ -84,15 +76,14 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   ) external virtual override returns(uint128) {
     (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
 
-    require(rarity > 0 && rarity < 3, 'RARITY');
+    require(rarity > 0 && rarity < 3, "RARITY");
     uint32 chance = (rarity == 1 ? 75 : 25) * uint32(chances);
     uint32 threshold = (FurLib.Max32 / 1000) * (1000 - chance);
     uint256 rolled =
       (uint256(roll(modifiers.expPercent)) * uint256(modifiers.luckPercent))
       / 100;
 
-    if (rolled <= threshold) return 0;
-    return (stat * 256) + (uint16(rarity + 1) * (256 ** 2));
+    return rolled < threshold ? 0 : _packLoot(rarity + 1, stat);
   }
 
   /// @notice Main loot-drop functionm
@@ -102,17 +93,20 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   ) external virtual override onlyFurballs returns(uint128) {
     // Only battles drop loot.
     if (modifiers.zone >= 0x10000) return 0;
-    if (modifiers.weight >= 50) return 0;
 
     (uint8 rarity, uint8 stat) = rollRarityStat(
       uint32((intervals * uint256(modifiers.luckPercent)) /100), 0);
-    if (rarity == 0) return 0;
-    return (uint16(rarity) * (256 ** 2)) + (stat * 256);
+    return _packLoot(rarity, stat);
+  }
+
+  function _packLoot(uint16 rarity, uint16 stat) internal pure returns(uint128) {
+    return rarity == 0 ? 0 : (uint16(rarity) * 0x10000) + (stat * 0x100);
   }
 
   /// @notice Core loot drop rarity randomization
   /// @dev exposes an interface helpful for the unit tests, but is not otherwise called publicly
   function rollRarityStat(uint32 chance, uint32 seed) public returns(uint8, uint8) {
+    if (chance == 0) return (0, 0);
     uint32 threshold = 4320;
     uint32 rolled = roll(seed) % threshold;
     uint8 stat = uint8(rolled % 2);
@@ -149,19 +143,16 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
   /// @notice Layers on LootEngine modifiers to rewards
   function modifyReward(
-    uint256[] memory inventory,
+    FurLib.Furball memory furball,
     FurLib.RewardModifiers memory modifiers,
     uint32 teamSize,
-    uint64 lastTradedAt,
-    uint64 accountCreatedAt
+    uint64 accountCreatedAt,
+    bool contextual
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
-    // Raw/base stats
-    modifiers.furPercent += _furBoost(modifiers.level);
-
     // First add in the inventory
-    for (uint256 i=0; i<modifiers.weight; i++) {
-      uint128 lootId = uint128(inventory[i] / 256);
-      uint32 stackSize = uint32(inventory[i] % 256);
+    for (uint256 i=0; i<furball.inventory.length; i++) {
+      uint128 lootId = uint128(furball.inventory[i] / 256);
+      uint32 stackSize = uint32(furball.inventory[i] % 256);
       (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
       uint16 boost = uint16(rarity * stackSize * 5);
       if (stat == 0) {
@@ -171,7 +162,20 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
       }
     }
 
-    // Reward players for holding, but also punish the whales...
+    // Add all other bonuses
+    modifiers.expPercent += modifiers.happinessPoints;
+    modifiers.luckPercent += modifiers.happinessPoints;
+    modifiers.furPercent += _furBoost(furball.level) + modifiers.energyPoints;
+
+    // ---------- potentially detrimental effects ------------
+    // Negative impacts come last, so subtraction does not underflow.
+    if (furball.weight > 0) {
+      uint16 weightAdjustment = furball.weight * 2;
+      modifiers.luckPercent =
+        weightAdjustment >= modifiers.luckPercent ? 0 : (modifiers.luckPercent - weightAdjustment);
+    }
+
+    // Team size adjustment.
     if (teamSize < 10 && teamSize > 1) {
       uint16 amt = uint16(2 * (teamSize - 1));
       modifiers.expPercent += amt;
@@ -192,7 +196,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     FurLib.FurballStats memory stats = furballs.stats(tokenId, false);
     return abi.encodePacked(
       abi.encodePacked(
-        FurLib.traitValue("Level", stats.modifiers.level),
+        FurLib.traitValue("Level", stats.definition.level),
         FurLib.traitNumber("Edition", (tokenId % 256) + 1),
         FurLib.traitValue("Loot", stats.definition.inventory.length),
         FurLib.traitValue("Rarity", stats.definition.rarity),
@@ -234,7 +238,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   }
 
   modifier onlyFurballs() {
-    require(msg.sender == address(furballs));
+    require(msg.sender == address(furballs), "FBL");
     _;
   }
 }

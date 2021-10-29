@@ -8,6 +8,7 @@ pragma solidity ^0.8.6;
 library FurLib {
   // Key data structure given to clients for high-level furball access (furballs.stats)
   struct FurballStats {
+    uint256 moves;        // The size of the collection array for this furball, which is move num.
     uint16 expRate;
     uint16 furRate;
     RewardModifiers modifiers;
@@ -32,6 +33,7 @@ library FurLib {
     uint32 experience;    // EXP
     uint32 zone;          // When exploring, the zone number. Otherwise, battling.
     uint16 level;         // Current EXP => level; can change based on level up during collect
+    uint16 weight;        // Total weight (number of items in inventory)
     uint64 birth;         // Timestamp of furball creation
     uint64 trade;         // Timestamp of last furball trading wallets
     uint64 last;          // Timestamp of last action (battle/explore)
@@ -46,9 +48,6 @@ library FurLib {
     uint16 happinessPoints;
     uint16 energyPoints;
     uint32 zone;
-    uint16 weight;        // Inventory size
-    uint16 level;         // Starting level (at beginning of collection cycle)
-    uint32 moves;         // How many collections have there been?
   }
 
   // For sale via loot engine.
@@ -69,6 +68,25 @@ library FurLib {
 
   uint256 public constant OnePercent = 1000;
   uint256 public constant OneHundredPercent = 100000;
+
+  /// @notice Shortcut for equations that saves gas
+  /// @dev The expression (0x100 ** byteNum) is expensive; this covers byte packing for editions.
+  function bytePower(uint8 byteNum) internal pure returns (uint256) {
+    if (byteNum == 0) return 0x1;
+    if (byteNum == 1) return 0x100;
+    if (byteNum == 2) return 0x10000;
+    if (byteNum == 3) return 0x1000000;
+    if (byteNum == 4) return 0x100000000;
+    if (byteNum == 5) return 0x10000000000;
+    if (byteNum == 6) return 0x1000000000000;
+    if (byteNum == 7) return 0x100000000000000;
+    if (byteNum == 8) return 0x10000000000000000;
+    if (byteNum == 9) return 0x1000000000000000000;
+    if (byteNum == 10) return 0x100000000000000000000;
+    if (byteNum == 11) return 0x10000000000000000000000;
+    if (byteNum == 12) return 0x1000000000000000000000000;
+    return (0x100 ** byteNum);
+  }
 
   function trait(string memory traitType, string memory value) internal pure returns (bytes memory) {
     return abi.encodePacked('{"trait_type": "', traitType,'", "value": "', value, '"}, ');
@@ -108,7 +126,7 @@ library FurLib {
   }
 
   function extractByte(uint256 tokenId, uint8 byteNum) internal pure returns(uint8) {
-    return uint8((tokenId / (256 ** uint256(byteNum))) % 256);
+    return uint8((tokenId / bytePower(byteNum)) % 0x100);
   }
 
   function bytesHex(bytes memory data) internal pure returns(string memory) {

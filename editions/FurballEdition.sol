@@ -16,6 +16,9 @@ import "./IFurballPalette.sol";
 /// @author LFG Gaming LLC
 /// @notice Base class for a furball edition with common implementations
 abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
+  // Internal reference to the EditionIndex
+  uint8 public override index = 0;
+
   // The time at which this edition goes live
   uint64 public override liveAt = 0;
 
@@ -37,6 +40,9 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   mapping(uint256 => string) public names;
 
   mapping(uint256 => string) public descriptions;
+
+  // A new furball was added to this edition.
+  event Spawn(uint8 editionIndex, uint32 editionCount);
 
   IFurballPaths[] private _paths;
 
@@ -63,7 +69,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     for (uint256 i=0; i<partsAddresses.length; i++) {
       IFurballPart part = IFurballPart(partsAddresses[i]);
       string memory slot = part.slot();
-      require(address(_parts[slot]) == address(0), 'PART');
+      require(address(_parts[slot]) == address(0), "PART");
       slots.push(slot);
       _parts[slot] = part;
     }
@@ -115,6 +121,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     require(furballs.isAdmin(msg.sender) || msg.sender == address(furballs));
     count += amount;
     minted[to] += amount;
+    emit Spawn(index, count);
     return true;
   }
 
@@ -157,11 +164,11 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   function spawn() external override returns (uint256, uint16) {
     uint8 palette = uint8(roll(0) % _palette.numPalettes());
     uint8 bk = uint8(roll(0) % _palette.numBackgroundColors());
-    uint256 tokenId = (bk * (256 ** 2)) + (palette * 256);
+    uint256 tokenId = (bk * 0x10000) + (palette * 0x100);
     uint16 boost = 0;
     for (uint8 slot=0; slot<slots.length; slot++) {
       (uint256 id, uint8 rarity) = rollSlot(0, slot, 0);
-      tokenId += id * (256 ** (slot + 3));
+      tokenId += id * FurLib.bytePower(slot + 3);
       if(rarity > 0) {
         boost += uint16(rarity + 1) * 5;
       }
@@ -253,7 +260,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
       'path', 'polygon', 'polyline', 'stop', 'rect'];
 
     uint8 tagType = uint8(data[ptr]);
-    require(tagType < 11, 'TAG');
+    require(tagType < 11, "TAG");
     bytes memory svg = abi.encodePacked('<', tagMap[tagType], ' ');
 
     uint8 numProps = uint8(data[ptr + 1]);
@@ -297,7 +304,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
         // DISPLAY
         (ptr, propStr) = FurDefs.renderDisplay(ptr + 1, data);
       } else {
-        require(false, string(abi.encodePacked('PROP', FurLib.uint2str(propIdx))));
+        require(false, "PROP");
       }
       svg = abi.encodePacked(svg, propStr);
     }
@@ -331,7 +338,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     } else if (t == 3 || t == 4) {
       return (ptr + 2, abi.encodePacked(strokeMap[t], '="', FurLib.uint2str(uint8(data[ptr + 1])), '" '));
     }
-    require(false, 'STROKE');
+    require(false, "STROKE");
   }
 
   function _renderStyle(uint64 ptr, bytes memory data, uint8 palette) internal view returns (uint64, bytes memory) {
@@ -348,7 +355,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
         (ptr, innerVal) = FurDefs.unpackFloat(ptr + 1, data);
         vals = abi.encodePacked(vals, 'stop-opacity:', innerVal, i == (cnt - 1) ? '' : ';');
       } else {
-        require(false, 'STYLE');
+        require(false, "STYLE");
       }
     }
     return (ptr, abi.encodePacked('style="', vals, '" '));
@@ -378,7 +385,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     if (t == 4) return (ptr + 1, "#FFFFFF");
     if (t == 5) return (ptr + 1, abi.encodePacked('#', _palette.primaryColor(palette)));
     if (t == 6) return (ptr + 1, abi.encodePacked('#', _palette.secondaryColor(palette)));
-    require(false, 'COL');
+    require(false, "COL");
   }
 
   function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {

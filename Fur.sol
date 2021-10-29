@@ -14,6 +14,9 @@ contract Fur is ERC20 {
   // n.b., this contract has some unusual tight-coupling between FUR and Furballs
   // Simple reason: this contract had more space, and is the only other allowed to know about ownership
   // Thus it serves as a sort of shop meta-store for Furballs
+  string public metaName = "Furballs";
+
+  string public metaDescription;
 
   // tokenId => mapping of fed _snacks
   mapping(uint256 => FurLib.Snack[]) public _snacks;
@@ -21,6 +24,13 @@ contract Fur is ERC20 {
   constructor(address furballsAddress, uint256 startingBalance) ERC20("Fur", "FUR") {
     furballs = Furballs(furballsAddress);
     _mint(msg.sender, startingBalance);
+  }
+
+  /// @notice Update metadata for main contractURI
+  function setMeta(string memory nameVal, string memory descVal) external {
+    require(furballs.isAdmin(msg.sender), "ADMIN");
+    metaName = nameVal;
+    metaDescription = descVal;
   }
 
   /// @notice FUR can only be minted by furballs doing battle.
@@ -66,18 +76,17 @@ contract Fur is ERC20 {
   /// @notice Pay any necessary fees to mint a furball
   /// @dev Delegated logic from Furballs;
   function purchaseMint(
-    address from, address to, IFurballEdition edition, uint8 count
+    address from, address to, IFurballEdition edition
   ) external onlyGame returns (bool) {
     require(edition.maxMintable(to) > 0, "LIVE");
     uint32 cnt = edition.count();
 
-    require(count == 1 || furballs.isAdmin(from) || from == address(furballs.engine()), 'COUNT');
     uint32 adoptable = edition.maxAdoptable();
     bool requiresPurchase = cnt >= adoptable;
 
     if (requiresPurchase) {
       // _gift will throw if cannot gift or cannot afford cost
-      _gift(from, to, edition.purchaseFur() * count);
+      _gift(from, to, edition.purchaseFur());
     }
     return requiresPurchase;
   }
@@ -89,7 +98,7 @@ contract Fur is ERC20 {
     address from, uint256 tokenId, uint128 lootId, uint8 chances
   ) external onlyGame returns(uint128) {
     address owner = furballs.ownerOf(tokenId);
-    require(chances <= 10 && chances > 0, 'CHANCE');
+    require(chances <= 10 && chances > 0, "CHANCE");
 
     // _gift will throw if cannot gift or cannot afford cost
     _gift(from, owner, 10000 * uint256(chances));
@@ -103,8 +112,8 @@ contract Fur is ERC20 {
     address from, uint256 tokenId, uint32 snackId, uint16 count
   ) external onlyGame {
     FurLib.Snack memory snack = furballs.engine().getSnack(snackId);
-    require(snack.count > 0, 'COUNT');
-    require(snack.fed == 0, 'FED');
+    require(snack.count > 0, "COUNT");
+    require(snack.fed == 0, "FED");
 
     // _gift will throw if cannot gift or cannot afford costQ
     _gift(from, furballs.ownerOf(tokenId), snack.furCost * count);
@@ -163,7 +172,7 @@ contract Fur is ERC20 {
     bool isGift = to != from;
 
     // Only admins or game engine can send gifts (to != self), which are always free.
-    require(!isGift || address(furballs.engine()) == from || furballs.isAdmin(from), 'GIFT');
+    require(!isGift || address(furballs.engine()) == from || furballs.isAdmin(from), "GIFT");
 
     if (!isGift && furCost > 0) {
       _burn(from, furCost);
@@ -175,7 +184,7 @@ contract Fur is ERC20 {
   modifier onlyGame() {
     require(msg.sender == address(furballs) ||
       furballs.isAdmin(msg.sender) ||
-      msg.sender == address(furballs.engine()), 'GAME');
+      msg.sender == address(furballs.engine()), "GAME");
     _;
   }
 }

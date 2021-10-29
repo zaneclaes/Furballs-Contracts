@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 /// @author LFG Gaming LLC
 /// @notice Interface for a single edition within Furballs
 interface IFurballEdition is IERC165 {
+  function index() external view returns(uint8);
   function count() external view returns(uint16);
   function maxCount() external view returns (uint16); // total max count in this edition
   function addCount(address to, uint16 amount) external returns(bool);

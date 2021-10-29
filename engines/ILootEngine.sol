@@ -9,12 +9,6 @@ import "../utils/FurLib.sol";
 /// @author LFG Gaming LLC
 /// @notice The loot engine is patchable by replacing the Furballs' engine with a new version
 interface ILootEngine is IERC165 {
-  /// @notice Patchable game name for updates in store metadata
-  function name() external pure returns (string memory);
-
-  /// @notice Patchable game description for updates in store metadata
-  function description() external pure returns (string memory);
-
   /// @notice Max experience (and thus max level) could grow over time
   function maxExperience() external pure returns(uint32);
 
@@ -34,12 +28,15 @@ interface ILootEngine is IERC165 {
 
   /// @notice Calculates the effects of the loot in a Furball's inventory
   function modifyReward(
-    uint256[] memory inventory,
+    FurLib.Furball memory furball,
     FurLib.RewardModifiers memory baseModifiers,
     uint32 teamSize,
-    uint64 lastTradedAt,
-    uint64 accountCreatedAt
+    uint64 accountCreatedAt,
+    bool contextual
   ) external view returns(FurLib.RewardModifiers memory);
+
+  /// @notice Loot can have different weight to help prevent over-powering a furball
+  function weightOf(uint128 lootId) external pure returns (uint16);
 
   /// @notice JSON object for displaying metadata on OpenSea, etc.
   function attributesMetadata(uint256 tokenId) external view returns(bytes memory);
