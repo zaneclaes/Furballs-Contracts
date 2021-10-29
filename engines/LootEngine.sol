@@ -85,9 +85,10 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
 
     require(rarity > 0 && rarity < 3, 'RARITY');
-    uint32 threshold = (FurLib.Max32 / 1000) * (1000 - (rarity == 1 ? 75 : 25));
+    uint32 chance = (rarity == 1 ? 75 : 25) * uint32(chances);
+    uint32 threshold = (FurLib.Max32 / 1000) * (1000 - chance);
     uint256 rolled =
-      (uint256(roll(modifiers.expPercent)) * uint256(modifiers.luckPercent) * uint256(chances))
+      (uint256(roll(modifiers.expPercent)) * uint256(modifiers.luckPercent))
       / 100;
 
     if (rolled <= threshold) return 0;

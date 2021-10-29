@@ -62,8 +62,6 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
   /// @notice Mints a new furball from the current edition (if there are any remaining)
   /// @dev Limits and fees are set by IFurballEdition
   function mint(address to, uint8 editionIndex, uint8 count) external {
-    require(editionIndex < editions.length, "ED");
-
     // Will _require necessary conditions
     fur.purchaseMint(_approvedSender(to), to, editions[editionIndex], count);
 
@@ -241,6 +239,8 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
 
     // Add happiness/energy to core stats after everything else
     reward.expPercent += reward.happinessPoints;
+    reward.luckPercent += reward.happinessPoints;
+    reward.furPercent += reward.energyPoints;
 
     return reward;
   }
