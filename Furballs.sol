@@ -62,9 +62,9 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
 
   /// @notice Mints a new furball from the current edition (if there are any remaining)
   /// @dev Limits and fees are set by IFurballEdition
-  function mint(address[] memory to, uint8 editionIndex) external {
+  function mint(address[] memory to, uint8 editionIndex, address actor) external {
     for (uint8 i=0; i<to.length; i++) {
-      fur.purchaseMint(_approvedSender(to[i]), to[i], editions[editionIndex]);
+      fur.purchaseMint(_approvedSender(actor), to[i], editions[editionIndex]);
       _spawn(to[i], editionIndex, 0);
     }
   }
@@ -295,13 +295,11 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
 
     // Ensure that this wallet has not exceeded its per-edition mint-cap
     uint32 owned = edition.minted(to);
-    uint32 limit = edition.maxMintable(to);
-    require(owned < limit, "LIMIT");
+    require(owned < edition.maxMintable(to), "LIMIT");
 
     // Check the current edition's constraints (caller should have checked costs)
     uint16 cnt = edition.count();
-    uint32 max = edition.maxCount();
-    require(cnt < max, "MAX");
+    require(cnt < edition.maxCount(), "MAX");
 
     // Create the memory struct that represens the furball
     uint256[] memory inv;

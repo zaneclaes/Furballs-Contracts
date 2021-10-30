@@ -20,19 +20,20 @@ contract Edition1 is FurballEdition {
     if (furballs.isAdmin(addr)) {
       return withFur ? 75 : 50;
     }
-    if (liveAt == 0 || liveAt > uint64(block.timestamp)) {
-      return _whitelist[addr];
-    }
-    return withFur ? 9 : 5;
+    bool live = liveAt != 0 && liveAt <= uint64(block.timestamp);
+    uint16 min = live ? (withFur ? 9 : 5) : 0;
+    return _whitelist[addr] > min ? _whitelist[addr] : min;
   }
 
   function purchaseFur() public override view returns(uint256) {
     if (count < maxAdoptable) return 0;
-    if (count < (maxAdoptable +  500)) return  40000;
-    if (count < (maxAdoptable + 1500)) return  80000;
-    if (count < (maxAdoptable + 2500)) return 160000;
-    if (count < (maxAdoptable + 3500)) return 320000;
-    if (count < (maxAdoptable + 4500)) return 640000;
-    return 10000000;
+    if (count < (maxAdoptable + 1000)) return  40000;
+    if (count < (maxAdoptable + 2000)) return  80000;
+    if (count < (maxAdoptable + 3000)) return 160000;
+    if (count < (maxAdoptable + 4000)) return 320000;
+    if (count < (maxAdoptable + 4750)) return 640000;
+    if (count < (maxAdoptable + 4800)) return 10000000;
+    if (count < (maxAdoptable + 4900)) return 100000000;
+    return 1000000000;
   }
 }

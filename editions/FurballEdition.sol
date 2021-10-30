@@ -31,7 +31,8 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   // How many has each wallet minted in this edition?
   mapping(address => uint16) public override minted;
 
-  mapping(string => IFurballPart) private _parts;
+  // mapping(string => IFurballPart) private _parts;
+  IFurballPart[] private _parts;
 
   IFurballPalette private _palette;
 
@@ -55,6 +56,12 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   Furballs public furballs;
 
+  uint8 private _numPalettes;
+
+  uint8 private _numBackgrounds;
+
+  mapping(uint8 => mapping(uint8 => uint8[])) private _options;
+
   function modifyReward(
     FurLib.RewardModifiers memory modifiers, uint256 tokenId
   ) external override virtual view returns(FurLib.RewardModifiers memory) {
@@ -66,12 +73,18 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   ) {
     furballs = Furballs(furballsAddress);
     _palette = IFurballPalette(paletteAddress);
+
+    _numPalettes = _palette.numPalettes();
+    _numBackgrounds = _palette.numBackgroundColors();
+
     for (uint256 i=0; i<partsAddresses.length; i++) {
       IFurballPart part = IFurballPart(partsAddresses[i]);
-      string memory slot = part.slot();
-      require(address(_parts[slot]) == address(0), "PART");
-      slots.push(slot);
-      _parts[slot] = part;
+      slots.push(part.slot());
+      _parts.push(IFurballPart(partsAddresses[i]));
+
+      for (uint8 r=0; r<=3; r++) {
+        _options[uint8(i)][uint8(r)] = part.options(r);
+      }
     }
     for (uint256 i=0; i<pathsAddresses.length; i++) {
       IFurballPaths paths = IFurballPaths(pathsAddresses[i]);
@@ -130,7 +143,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   }
 
   function numParts(uint8 slot) external virtual view override returns(uint8) {
-    return _parts[slots[slot]].count();
+    return _parts[slot].count();
   }
 
   function setLiveAt(uint64 at) public onlyAdmin {
@@ -154,23 +167,27 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
       ret = abi.encodePacked(ret,
         added ? ', ' : '',
         '{"trait_type": "', slots[slot], '", "value": "',
-        _parts[slots[slot]].name(idx), FurDefs.raritySuffix(_getRarity(slot, idx)), '"}'
+        _parts[slot].name(idx), FurDefs.raritySuffix(_getRarity(slot, idx)), '"}'
       );
       added = true;
     }
     return string(ret);
   }
 
+  /// @notice Main "mint" function for the edition, generating the tokenID & rarity
   function spawn() external override returns (uint256, uint16) {
-    uint8 palette = uint8(roll(0) % _palette.numPalettes());
-    uint8 bk = uint8(roll(0) % _palette.numBackgroundColors());
+    uint8 palette = uint8(roll(0) % _numPalettes);
+    uint8 bk = uint8(roll(0) % _numBackgrounds);
+    uint256 numSlots = slots.length;
     uint256 tokenId = (bk * 0x10000) + (palette * 0x100);
     uint16 boost = 0;
-    for (uint8 slot=0; slot<slots.length; slot++) {
+    for (uint8 slot=0; slot<numSlots; slot++) {
       (uint256 id, uint8 rarity) = rollSlot(0, slot, 0);
       tokenId += id * FurLib.bytePower(slot + 3);
       if(rarity > 0) {
-        boost += uint16(rarity + 1) * 5;
+        if (rarity == 1) boost += 5;
+        else if (rarity == 2) boost += 15;
+        else if (rarity == 3) boost += 30;
       }
     }
     return (tokenId, boost);
@@ -190,13 +207,13 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     return 0;
   }
 
-  function rollSlot(uint32 seed, uint8 i, uint8 rarity) public returns(uint256, uint8) {
+  function rollSlot(uint32 seed, uint8 slot, uint8 rarity) public returns(uint256, uint8) {
     rarity = rarity > 0 ? rarity : rollRarity(seed);
-    uint8[] memory opts = _parts[slots[uint(i)]].options(rarity);
+    uint8[] memory opts = _options[slot][rarity];
     if (opts.length == 0) {
       if (rarity >= 1) {
         // Rolled a rare attribute, but there were no options. Re-try this roll.
-        return rollSlot(seed, i, rarity - 1);
+        return rollSlot(seed, slot, rarity - 1);
       } else {
         // This is a null slot.
         return (0, 0);
@@ -207,7 +224,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   function _getRarity(uint8 slot, uint8 idx) internal virtual view returns(uint8) {
     for (uint8 rarity = 1; rarity <= 4; rarity++) {
-      uint8[] memory opts = _parts[slots[slot]].options(rarity);
+      uint8[] memory opts = _options[slot][rarity];
       for (uint8 o=0; o<opts.length; o++) {
         if (opts[o] == idx) {
           return rarity;
@@ -231,7 +248,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   function renderSlot(uint8 slot, uint8 index, uint8 palette) public view returns(string memory) {
     bytes memory svg = '';
     bytes memory tag;
-    bytes memory data = _parts[slots[slot]].data();
+    bytes memory data = _parts[slot].data();
     uint64 ptr = _pointer(data, index, true) + 3;
     uint8 numTags = uint8(data[ptr - 1]);
     for (uint8 t=0; t < numTags; t++) {

@@ -98,10 +98,10 @@ contract Fur is ERC20 {
     address from, uint256 tokenId, uint128 lootId, uint8 chances
   ) external onlyGame returns(uint128) {
     address owner = furballs.ownerOf(tokenId);
-    require(chances <= 10 && chances > 0, "CHANCE");
+    require(chances < 10 && chances > 0, "CHANCE");
 
     // _gift will throw if cannot gift or cannot afford cost
-    _gift(from, owner, 10000 * uint256(chances));
+    _gift(from, owner, 500 * uint256(chances));
 
     return furballs.engine().upgradeLoot(modifiers, owner, lootId, chances);
   }
@@ -183,8 +183,9 @@ contract Fur is ERC20 {
 
   modifier onlyGame() {
     require(msg.sender == address(furballs) ||
-      furballs.isAdmin(msg.sender) ||
-      msg.sender == address(furballs.engine()), "GAME");
+      msg.sender == address(furballs.engine()) ||
+      msg.sender == address(furballs.furgreement()) ||
+      furballs.isAdmin(msg.sender), "GAME");
     _;
   }
 }

@@ -113,9 +113,9 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
     if (chance > threshold || rolled >= (threshold - chance)) return (3, stat);
     threshold -= chance;
-    if (chance * 2 > threshold || rolled >= (threshold - chance * 2)) return (2, stat);
-    threshold -= chance * 2;
-    if (chance * 4 > threshold || rolled >= (threshold - chance * 4)) return (1, stat);
+    if (chance * 3 > threshold || rolled >= (threshold - chance * 3)) return (2, stat);
+    threshold -= chance * 3;
+    if (chance * 6 > threshold || rolled >= (threshold - chance * 6)) return (1, stat);
     return (0, stat);
   }
 
@@ -149,42 +149,45 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     uint64 accountCreatedAt,
     bool contextual
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
+    // Use temporary variables instead of re-assignment
+    uint16 expPercent = modifiers.expPercent + modifiers.happinessPoints;
+    uint16 luckPercent = modifiers.luckPercent + modifiers.happinessPoints;
+    uint16 furPercent = modifiers.furPercent + _furBoost(furball.level) + modifiers.energyPoints;
+
     // First add in the inventory
     for (uint256 i=0; i<furball.inventory.length; i++) {
       uint128 lootId = uint128(furball.inventory[i] / 256);
       uint32 stackSize = uint32(furball.inventory[i] % 256);
       (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
-      uint16 boost = uint16(rarity * stackSize * 5);
+      uint16 boost = uint16(_lootRarityBoost(rarity) * stackSize);
       if (stat == 0) {
-        modifiers.expPercent += boost;
+        expPercent += boost;
       } else {
-        modifiers.furPercent += boost;
+        furPercent += boost;
       }
     }
-
-    // Add all other bonuses
-    modifiers.expPercent += modifiers.happinessPoints;
-    modifiers.luckPercent += modifiers.happinessPoints;
-    modifiers.furPercent += _furBoost(furball.level) + modifiers.energyPoints;
 
     // ---------- potentially detrimental effects ------------
     // Negative impacts come last, so subtraction does not underflow.
     if (furball.weight > 0) {
       uint16 weightAdjustment = furball.weight * 2;
-      modifiers.luckPercent =
-        weightAdjustment >= modifiers.luckPercent ? 0 : (modifiers.luckPercent - weightAdjustment);
+      luckPercent = weightAdjustment >= luckPercent ? 0 : (luckPercent - weightAdjustment);
     }
 
     // Team size adjustment.
     if (teamSize < 10 && teamSize > 1) {
       uint16 amt = uint16(2 * (teamSize - 1));
-      modifiers.expPercent += amt;
-      modifiers.furPercent += amt;
+      expPercent += amt;
+      furPercent += amt;
     } else if (teamSize > 10) {
       uint16 amt = uint16(5 * (teamSize > 20 ? 10 : (teamSize - 10)));
-      modifiers.expPercent -= amt;
-      modifiers.furPercent -= amt;
+      expPercent -= amt;
+      furPercent -= amt;
     }
+
+    modifiers.expPercent = expPercent;
+    modifiers.furPercent = furPercent;
+    modifiers.luckPercent = luckPercent;
 
     return modifiers;
   }
@@ -211,6 +214,13 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
         FurLib.traitDate("Birthday", stats.definition.birth)
       )
     );
+  }
+
+  function _lootRarityBoost(uint16 rarity) internal pure returns (uint16) {
+    if (rarity == 1) return 5;
+    else if (rarity == 2) return 15;
+    else if (rarity == 3) return 30;
+    return 0;
   }
 
   /// @notice Gets the FUR boost for a given level
