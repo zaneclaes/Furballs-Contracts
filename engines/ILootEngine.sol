@@ -9,9 +9,6 @@ import "../utils/FurLib.sol";
 /// @author LFG Gaming LLC
 /// @notice The loot engine is patchable by replacing the Furballs' engine with a new version
 interface ILootEngine is IERC165 {
-  /// @notice Max experience (and thus max level) could grow over time
-  function maxExperience() external pure returns(uint32);
-
   /// @notice When a Furball comes back from exploration, potentially give it some loot.
   function dropLoot(uint32 intervals, FurLib.RewardModifiers memory mods) external returns(uint128);
 
@@ -51,5 +48,12 @@ interface ILootEngine is IERC165 {
   function approveSender(address sender) external view returns(address);
 
   /// @notice Called when a Furball is traded to update delegate logic
-  function onTrade(address from, address to, uint256 tokenId) external;
+  function onTrade(
+    FurLib.Furball memory furball, address from, address to
+  ) external;
+
+  /// @notice Handles experience gain during collection
+  function onExperience(
+    FurLib.Furball memory furball, address owner, uint32 experience
+  ) external returns(uint32 totalExp, uint16 level);
 }

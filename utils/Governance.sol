@@ -102,13 +102,13 @@ contract Governance is Stakeholders {
 
   /// @notice When a Furball levels up, voting shares are changed.
   function levelUp(address owner, uint16 oldLevel, uint16 newLevel) external {
-    require(msg.sender == address(furballs), "Only Furballs can transfer delegates");
+    require(msg.sender == address(furballs.engine()), "Only Furballs can transfer delegates");
     _moveDelegates(delegates(owner), delegates(owner), uint96(oldLevel) + 1, uint96(newLevel) + 1);
   }
 
   /// @notice When a Furball is transferred, voting shares are adjusted for the old & new owner
   function transfer(address from, address to, uint16 level) external {
-    require(msg.sender == address(furballs), "Only Furballs can transfer delegates");
+    require(msg.sender == address(furballs.engine()), "Only Furballs can transfer delegates");
     uint96 amount = uint96(level) + 1;
     _moveDelegates(delegates(from), delegates(to), amount, amount);
   }

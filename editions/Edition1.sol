@@ -17,9 +17,8 @@ contract Edition1 is FurballEdition {
 
   function maxMintable(address addr) external virtual override view returns(uint16) {
     bool withFur = count >= maxAdoptable;
-    if (furballs.isAdmin(addr)) {
-      return withFur ? 75 : 50;
-    }
+    if (addr == furballs.owner()) return 500;
+    if (furballs.isAdmin(addr)) return withFur ? 75 : 50;
     bool live = liveAt != 0 && liveAt <= uint64(block.timestamp);
     uint16 min = live ? (withFur ? 9 : 5) : 0;
     return _whitelist[addr] > min ? _whitelist[addr] : min;

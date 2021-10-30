@@ -11,7 +11,6 @@ import "./utils/FurLib.sol";
 import "./utils/FurDefs.sol";
 import "./utils/Moderated.sol";
 import "./utils/Governance.sol";
-import "./utils/Exp.sol";
 import "./Fur.sol";
 import "./Furgreement.sol";
 // import "hardhat/console.sol";
@@ -20,7 +19,7 @@ import "./Furgreement.sol";
 /// @author LFG Gaming LLC
 /// @notice Mints Furballs on the Ethereum blockchain
 /// @dev https://furballs.com/contract
-contract Furballs is ERC721Enumerable, Moderated, Exp {
+contract Furballs is ERC721Enumerable, Moderated {
   Fur public fur;
 
   IFurballEdition[] public editions;
@@ -245,22 +244,11 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
     } else {
       // Explore zones earn EXP...
       res.experience = uint32(_calculateReward(res.duration, FurLib.EXP_PER_INTERVAL, mods.expPercent));
-      uint32 has = furballs[tokenId].experience;
-      uint32 max = engine.maxExperience();
-      if (res.experience > 0) {
-        has = (res.experience < max && has < (max - res.experience)) ? (has + res.experience) : max;
-        furballs[tokenId].experience = has;
+      (uint32 totalExp, uint16 levels) = engine.onExperience(furballs[tokenId], owner, res.experience);
+      res.levels = levels;
 
-        // Calculate new level & check for level-up
-        uint16 oldLevel = furballs[tokenId].level;
-        uint16 level = expToLevel(has, max);
-
-        if (level > oldLevel) {
-          furballs[tokenId].level = level;
-          res.levels = (level - oldLevel);
-          if (address(governance) != address(0)) governance.levelUp(owner, oldLevel, level);
-        }
-      }
+      furballs[tokenId].level += levels;
+      furballs[tokenId].experience = totalExp;
     }
 
     // Generate loot and assign to furball
@@ -321,11 +309,16 @@ contract Furballs is ERC721Enumerable, Moderated, Exp {
     uint256 tokenId
   ) internal override {
     super._beforeTokenTransfer(from, to, tokenId);
-    furballs[tokenId].trade = uint64(block.timestamp);
-    engine.onTrade(from, to, tokenId);
 
+    // Update internal data states
+    furballs[tokenId].trade = uint64(block.timestamp);
     if (age[to] == 0) age[to] = uint64(block.timestamp);
-    if (address(governance) != address(0)) governance.transfer(from, to, furballs[tokenId].level);
+
+    // Update max counts
+    fur.updateOwnership(to, balanceOf(to) + 1);
+
+    // Delegate other logic to the engine
+    engine.onTrade(furballs[tokenId], from, to);
   }
 
   // -----------------------------------------------------------------------------------------------

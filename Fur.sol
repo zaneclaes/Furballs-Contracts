@@ -9,17 +9,26 @@ import "./editions/IFurballEdition.sol";
 /// @author LFG Gaming LLC
 /// @notice Utility token for in-game rewards in Furballs
 contract Fur is ERC20 {
-  Furballs public furballs;
-
   // n.b., this contract has some unusual tight-coupling between FUR and Furballs
   // Simple reason: this contract had more space, and is the only other allowed to know about ownership
   // Thus it serves as a sort of shop meta-store for Furballs
+  Furballs public furballs;
+
   string public metaName = "Furballs";
 
-  string public metaDescription;
+  string public metaDescription =
+    "Furballs are entirely on-chain, with a full interactive gameplay experience at Furballs.com. "
+    "There are 88 billion+ possible furball combinations in the first edition, each with their own special abilities"
+    "... but only thousands minted per edition. Each edition has new artwork, game modes, and surprises.";
 
   // tokenId => mapping of fed _snacks
   mapping(uint256 => FurLib.Snack[]) public _snacks;
+
+  // Tracks the MAX which are ever owned by a given address.
+  mapping(address => uint256) public owned;
+
+  // List of all addresses which have ever owned a furball.
+  address[] public owners;
 
   constructor(address furballsAddress, uint256 startingBalance) ERC20("Fur", "FUR") {
     furballs = Furballs(furballsAddress);
@@ -27,8 +36,7 @@ contract Fur is ERC20 {
   }
 
   /// @notice Update metadata for main contractURI
-  function setMeta(string memory nameVal, string memory descVal) external {
-    require(furballs.isAdmin(msg.sender), "ADMIN");
+  function setMeta(string memory nameVal, string memory descVal) external onlyAdmin {
     metaName = nameVal;
     metaDescription = descVal;
   }
@@ -42,6 +50,14 @@ contract Fur is ERC20 {
   /// @notice FUR can be spent by Furballs, or by the LootEngine (shopping, in the future)
   function spend(address addr, uint256 amount) external onlyGame {
     _burn(addr, amount);
+  }
+
+  /// @notice Track the Furball ownership counts
+  function updateOwnership(address addr, uint256 count) external onlyGame {
+    uint256 exist = owned[addr];
+    if (count <= exist) return;
+    if (exist == 0) owners.push(addr);
+    owned[addr] = count;
   }
 
   /// @notice Returns the snacks currently applied to a Furball
@@ -179,6 +195,11 @@ contract Fur is ERC20 {
     }
 
     return isGift;
+  }
+
+  modifier onlyAdmin() {
+    require(furballs.isAdmin(msg.sender), "ADMIN");
+    _;
   }
 
   modifier onlyGame() {

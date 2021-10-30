@@ -7,15 +7,19 @@ import "../Furballs.sol";
 import "../utils/FurLib.sol";
 import "../utils/ProxyRegistry.sol";
 import "../utils/Dice.sol";
+import "../utils/Exp.sol";
+import "../utils/Governance.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
 /// @title LootEngine
 /// @author LFG Gaming LLC
 /// @notice Base implementation of the loot engine
-abstract contract LootEngine is ERC165, ILootEngine, Dice {
+abstract contract LootEngine is ERC165, ILootEngine, Dice, Exp {
   Furballs public furballs;
 
   ProxyRegistry private _proxies;
+
+  uint32 maxExperience = 2010000;
 
   constructor(address furballsAddress, address proxyRegistry) {
     furballs = Furballs(furballsAddress);
@@ -23,13 +27,9 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
   }
 
   /// @notice Loot can have different weight to help prevent over-powering a furball
+  /// @dev Each point of weight can be offset by a point of energy; the result reduces luck
   function weightOf(uint128 lootId) external virtual override pure returns (uint16) {
-    return 1;
-  }
-
-  /// @notice maxExperience is simply hardcoded for now.
-  function maxExperience() external virtual override pure returns(uint32) {
-    return 2010000;
+    return 2;
   }
 
   /// @notice Checking the zone may use _require to detect preconditions.
@@ -62,10 +62,36 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     return sender;
   }
 
-  /// @notice The trade hook does nothing right now.
+  /// @notice Calculates new level for experience
+  function onExperience(
+    FurLib.Furball memory furball, address owner, uint32 experience
+  ) external virtual override onlyFurballs returns(uint32 totalExp, uint16 levels) {
+    if (experience == 0) return (0, 0);
+
+    uint32 has = furball.experience;
+    uint32 max = maxExperience;
+    totalExp = (experience < max && has < (max - experience)) ? (has + experience) : max;
+
+    // Calculate new level & check for level-up
+    uint16 oldLevel = furball.level;
+    uint16 level = expToLevel(totalExp, max);
+    levels = level > oldLevel ? (level - oldLevel) : 0;
+
+    if (levels > 0) {
+      Governance gov = furballs.governance();
+      if (address(gov) != address(0)) gov.levelUp(owner, oldLevel, level);
+    }
+
+    return (totalExp, levels);
+  }
+
+  /// @notice The trade hook can update balances or assign rewards
   function onTrade(
-    address from, address to, uint256 tokenId
-  ) external virtual override onlyFurballs { }
+    FurLib.Furball memory furball, address from, address to
+  ) external virtual override onlyFurballs {
+    Governance gov = furballs.governance();
+    if (address(gov) != address(0)) gov.transfer(from, to, furball.level);
+  }
 
   /// @notice Attempt to upgrade a given piece of loot (item ID)
   function upgradeLoot(
@@ -150,9 +176,11 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     bool contextual
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Use temporary variables instead of re-assignment
+    uint16 energy = modifiers.energyPoints;
+    uint16 weight = furball.weight;
     uint16 expPercent = modifiers.expPercent + modifiers.happinessPoints;
     uint16 luckPercent = modifiers.luckPercent + modifiers.happinessPoints;
-    uint16 furPercent = modifiers.furPercent + _furBoost(furball.level) + modifiers.energyPoints;
+    uint16 furPercent = modifiers.furPercent + _furBoost(furball.level) + energy;
 
     // First add in the inventory
     for (uint256 i=0; i<furball.inventory.length; i++) {
@@ -167,22 +195,32 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
       }
     }
 
-    // ---------- potentially detrimental effects ------------
-    // Negative impacts come last, so subtraction does not underflow.
-    if (furball.weight > 0) {
-      uint16 weightAdjustment = furball.weight * 2;
-      luckPercent = weightAdjustment >= luckPercent ? 0 : (luckPercent - weightAdjustment);
-    }
-
-    // Team size adjustment.
+    // Team size boosts!
     if (teamSize < 10 && teamSize > 1) {
       uint16 amt = uint16(2 * (teamSize - 1));
       expPercent += amt;
       furPercent += amt;
-    } else if (teamSize > 10) {
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Negative impacts come last, so subtraction does not underflow.
+    // ---------------------------------------------------------------------------------------------
+
+    // Penalties for whales.
+    if (teamSize > 10) {
       uint16 amt = uint16(5 * (teamSize > 20 ? 10 : (teamSize - 10)));
       expPercent -= amt;
       furPercent -= amt;
+    }
+
+    // Calculate weight & reduce luck
+    if (weight > 0) {
+      if (energy > 0) {
+        weight = (energy >= weight) ? 0 : (weight - energy);
+      }
+      if (weight > 0) {
+        luckPercent = weight >= luckPercent ? 0 : (luckPercent - weight);
+      }
     }
 
     modifiers.expPercent = expPercent;
