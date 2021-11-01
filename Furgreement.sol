@@ -2,6 +2,7 @@
 pragma solidity ^0.8.6;
 
 import "./Furballs.sol";
+import "./utils/FurProxy.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 
@@ -9,9 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 /// @author LFG Gaming LLC
 /// @notice Has permissions to act as a proxy to the Furballs contract
 /// @dev https://soliditydeveloper.com/ecrecover
-contract Furgreement is EIP712 {
-  Furballs public furballs;
-
+contract Furgreement is EIP712, FurProxy {
   mapping(address => uint256) private nonces;
 
   address[] public addressQueue;
@@ -24,9 +23,7 @@ contract Furgreement is EIP712 {
     uint256[] tokenIds;
   }
 
-  constructor(address furballsAddress) EIP712("Furgreement", "1") {
-    furballs = Furballs(furballsAddress);
-  }
+  constructor(address furballsAddress) EIP712("Furgreement", "1") FurProxy(furballsAddress) { }
 
   /// @notice Proxy playMany to Furballs contract
   function playFromSignature(

@@ -71,10 +71,36 @@ library FurLib {
     uint64 fed;           // When was it fed (if it is active)?
   }
 
+  // Input to the feed() function for multi-play
+  struct Feeding {
+    uint256 tokenId;
+    uint32 snackId;
+    uint16 count;
+  }
+
+  // Key addresses cached internally
+  // struct ProxyAddresses {
+  //   address engine;
+  //   address fur;
+  //   address furgreement;
+  //   address governance;
+  // }
+
   uint32 public constant Max32 = type(uint32).max;
+
+  uint8 public constant PERMISSION_MODERATOR = 2;
+  uint8 public constant PERMISSION_ADMIN = 4;
+  uint8 public constant PERMISSION_OWNER = 5;
+  uint8 public constant PERMISSION_CONTRACT = 0x10;
 
   uint32 public constant EXP_PER_INTERVAL = 500;
   uint32 public constant FUR_PER_INTERVAL = 100;
+
+  uint8 public constant LOOT_BYTE_STAT = 1;
+  uint8 public constant LOOT_BYTE_RARITY = 2;
+
+  uint8 public constant SNACK_BYTE_ENERGY = 0;
+  uint8 public constant SNACK_BYTE_HAPPINESS = 2;
 
   uint256 public constant OnePercent = 1000;
   uint256 public constant OneHundredPercent = 100000;
@@ -98,6 +124,11 @@ library FurLib {
     return (0x100 ** byteNum);
   }
 
+  /// @notice Helper to get a number of bytes from a value
+  function extractBytes(uint value, uint8 startAt, uint8 numBytes) internal pure returns (uint) {
+    return (value / bytePower(startAt)) % bytePower(numBytes);
+  }
+
   /// @notice Converts exp into a sqrt-able number.
   function expToLevel(uint32 exp, uint32 maxExp) internal pure returns(uint256) {
     exp = exp > maxExp ? maxExp : exp;
@@ -117,56 +148,14 @@ library FurLib {
     return y;
   }
 
-  function trait(string memory traitType, string memory value) internal pure returns (bytes memory) {
-    return abi.encodePacked('{"trait_type": "', traitType,'", "value": "', value, '"}, ');
-  }
-
-  function traitNumberDisplay(
-    string memory traitType, string memory displayType, uint256 value
-  ) internal pure returns (bytes memory) {
-    return abi.encodePacked(
-      '{"trait_type": "', traitType,
-      bytes(displayType).length > 0 ? '", "display_type": "' : '', displayType,
-      '", "value": ', uint2str(value), '}, '
-    );
-  }
-
-  function traitValue(string memory traitType, uint256 value) internal pure returns (bytes memory) {
-    return traitNumberDisplay(traitType, "", value);
-  }
-
-  /// @notice Convert a modifier percentage (120%) into a metadata +20% boost
-  function traitBoost(
-    string memory traitType, uint256 percent
-  ) internal pure returns (bytes memory) {
-    return traitNumberDisplay(traitType, "boost_percentage", percent > 100 ? (percent - 100) : 0);
-  }
-
-  function traitNumber(
-    string memory traitType, uint256 value
-  ) internal pure returns (bytes memory) {
-    return traitNumberDisplay(traitType, "number", value);
-  }
-
-  function traitDate(
-    string memory traitType, uint256 value
-  ) internal pure returns (bytes memory) {
-    return traitNumberDisplay(traitType, "number", value);
-  }
-
-  function extractByte(uint256 tokenId, uint8 byteNum) internal pure returns(uint8) {
-    return uint8((tokenId / bytePower(byteNum)) % 0x100);
-  }
-
+  /// @notice Convert bytes into a hex str, e.g., an address str
   function bytesHex(bytes memory data) internal pure returns(string memory) {
     bytes memory alphabet = "0123456789abcdef";
 
-    bytes memory str = new bytes(2 + data.length * 2);
-    str[0] = "0";
-    str[1] = "x";
+    bytes memory str = new bytes(data.length * 2);
     for (uint i = 0; i < data.length; i++) {
-        str[2+i*2] = alphabet[uint(uint8(data[i] >> 4))];
-        str[3+i*2] = alphabet[uint(uint8(data[i] & 0x0f))];
+        str[i*2] = alphabet[uint(uint8(data[i] >> 4))];
+        str[1 + i*2] = alphabet[uint(uint8(data[i] & 0x0f))];
     }
     return string(str);
   }

@@ -42,7 +42,7 @@ contract Governance is Community, Stakeholders {
       '{"name": "', metaName,'", "description": "', metaDescription,'"',
       ', "external_link": "https://furballs.com"',
       ', "seller_fee_basis_points": ', FurLib.uint2str(transactionFee),
-      ', "fee_recipient": "', FurLib.bytesHex(abi.encodePacked(treasury)), '"}'
+      ', "fee_recipient": "0x', FurLib.bytesHex(abi.encodePacked(treasury)), '"}'
     ))));
   }
 
@@ -70,7 +70,7 @@ contract Governance is Community, Stakeholders {
   /// @notice public accessor updates permissions
   function getAccount(address addr) external view returns (FurLib.Account memory) {
     FurLib.Account memory acc = _account[addr];
-    acc.permissions = _getPermissions(addr);
+    acc.permissions = _userPermissions(addr);
     return acc;
   }
 
@@ -91,7 +91,7 @@ contract Governance is Community, Stakeholders {
     FurLib.Account memory acc = _account[addr];
 
     // Recompute account permissions for internal rewards
-    uint8 permissions = _getPermissions(addr);
+    uint8 permissions = _userPermissions(addr);
     if (permissions != acc.permissions) _account[addr].permissions = permissions;
 
     // New account created?
@@ -125,13 +125,5 @@ contract Governance is Community, Stakeholders {
     } else if (standing < balance) {
       _burn(addr, balance - standing);
     }
-  }
-
-  function _getPermissions(address addr) internal view returns(uint8) {
-    if (addr == address(0)) return 0;
-    if (addr == furballs.owner()) return 4;
-    if (furballs.isAdmin(addr)) return 2;
-    if (furballs.isModerator(addr)) return 1;
-    return 0;
   }
 }

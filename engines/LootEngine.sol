@@ -5,25 +5,38 @@ import "./ILootEngine.sol";
 import "../editions/IFurballEdition.sol";
 import "../Furballs.sol";
 import "../utils/FurLib.sol";
+import "../utils/FurProxy.sol";
 import "../utils/ProxyRegistry.sol";
 import "../utils/Dice.sol";
 import "../utils/Governance.sol";
+import "../utils/MetaData.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
 /// @title LootEngine
 /// @author LFG Gaming LLC
 /// @notice Base implementation of the loot engine
-abstract contract LootEngine is ERC165, ILootEngine, Dice {
-  Furballs public furballs;
-
+abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   ProxyRegistry private _proxies;
+
+  // snackId to "definition" of the snack
+  mapping(uint32 => FurLib.Snack) private _snacks;
 
   uint32 maxExperience = 2010000;
 
-  constructor(address furballsAddress, address proxyRegistry) {
-    furballs = Furballs(furballsAddress);
+  constructor(address furballsAddress, address proxyRegistry) FurProxy(furballsAddress) {
     _proxies = ProxyRegistry(proxyRegistry);
+
+    _defineSnack(0x100, 24    ,  250, 15, 0);
+    _defineSnack(0x200, 24 * 3,  750, 20, 0);
+    _defineSnack(0x300, 24 * 7, 1500, 25, 0);
   }
+
+  // /// @notice Allows admins to configure the snack store.
+  // function setSnack(
+  //   uint32 snackId, uint32 duration, uint16 furCost, uint16 hap, uint16 en
+  // ) external onlyAdmin {
+  //   _defineSnack(snackId, duration, furCost, hap, en);
+  // }
 
   /// @notice Loot can have different weight to help prevent over-powering a furball
   /// @dev Each point of weight can be offset by a point of energy; the result reduces luck
@@ -147,24 +160,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
   /// @notice The snack shop has IDs for each snack definition
   function getSnack(uint32 snackId) external view virtual override returns(FurLib.Snack memory) {
-    FurLib.Snack memory snack = FurLib.Snack(snackId, 0, 0, 0, 0, 1, 0);
-    if (snackId % 256 == 0) {
-      uint8 snackSize = uint8((snackId / 256) % 256);
-      if (snackSize == 1) {
-        snack.duration = 24;
-        snack.happiness = 15;
-        snack.furCost = 250;
-      } else if (snackSize == 2) {
-        snack.duration = 72;
-        snack.happiness = 20;
-        snack.furCost = 750;
-      } else if (snackSize == 3) {
-        snack.duration = 24 * 7;
-        snack.happiness = 25;
-        snack.furCost = 1500;
-      }
-    }
-    return snack;
+    return _snacks[snackId];
   }
 
   /// @notice Layers on LootEngine modifiers to rewards
@@ -183,8 +179,8 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
     // First add in the inventory
     for (uint256 i=0; i<furball.inventory.length; i++) {
-      uint128 lootId = uint128(furball.inventory[i] / 256);
-      uint32 stackSize = uint32(furball.inventory[i] % 256);
+      uint128 lootId = uint128(furball.inventory[i] / 0x100);
+      uint32 stackSize = uint32(furball.inventory[i] % 0x100);
       (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
       uint16 boost = uint16(_lootRarityBoost(rarity) * stackSize);
       if (stat == 0) {
@@ -237,21 +233,33 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
     FurLib.FurballStats memory stats = furballs.stats(tokenId, false);
     return abi.encodePacked(
       abi.encodePacked(
-        FurLib.traitValue("Level", stats.definition.level),
-        FurLib.traitNumber("Edition", (tokenId % 256) + 1),
-        FurLib.traitValue("Loot", stats.definition.inventory.length),
-        FurLib.traitValue("Rarity", stats.definition.rarity),
-        FurLib.traitValue("EXP Rate", stats.expRate),
-        FurLib.traitValue("FUR Rate", stats.furRate),
-        FurLib.traitBoost("EXP Boost", stats.modifiers.expPercent),
-        FurLib.traitBoost("FUR Boost", stats.modifiers.furPercent),
-        FurLib.traitDate("Last Move", stats.definition.last)
+        MetaData.traitValue("Level", stats.definition.level),
+        MetaData.traitNumber("Edition", (tokenId % 0x100) + 1),
+        MetaData.traitValue("Loot", stats.definition.inventory.length),
+        MetaData.traitValue("Rarity", stats.definition.rarity),
+        MetaData.traitValue("EXP Rate", stats.expRate),
+        MetaData.traitValue("FUR Rate", stats.furRate),
+        MetaData.traitBoost("EXP Boost", stats.modifiers.expPercent),
+        MetaData.traitBoost("FUR Boost", stats.modifiers.furPercent),
+        MetaData.traitDate("Last Move", stats.definition.last)
       ),
       abi.encodePacked(
-        FurLib.traitDate("Acquired", stats.definition.trade),
-        FurLib.traitDate("Birthday", stats.definition.birth)
+        MetaData.traitDate("Acquired", stats.definition.trade),
+        MetaData.traitDate("Birthday", stats.definition.birth)
       )
     );
+  }
+
+  /// @notice Store a new snack definition
+  function _defineSnack(
+    uint32 snackId, uint32 duration, uint16 furCost, uint16 hap, uint16 en
+  ) internal {
+    _snacks[snackId].duration = duration;
+    _snacks[snackId].furCost = furCost;
+    _snacks[snackId].happiness = hap;
+    _snacks[snackId].energy = en;
+    _snacks[snackId].count = 1;
+    _snacks[snackId].fed = 0;
   }
 
   function _lootRarityBoost(uint16 rarity) internal pure returns (uint16) {
@@ -276,17 +284,14 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice {
 
   /// @notice Unpacks an item, giving its rarity + stat
   function _itemRarityStat(uint128 lootId) internal pure returns (uint8, uint8) {
-    return (FurLib.extractByte(lootId, 2), FurLib.extractByte(lootId, 1));
+    return (
+      uint8(FurLib.extractBytes(lootId, FurLib.LOOT_BYTE_RARITY, 1)),
+      uint8(FurLib.extractBytes(lootId, FurLib.LOOT_BYTE_STAT, 1)));
   }
 
   function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
     return
       interfaceId == type(ILootEngine).interfaceId ||
       super.supportsInterface(interfaceId);
-  }
-
-  modifier onlyFurballs() {
-    require(msg.sender == address(furballs), "FBL");
-    _;
   }
 }

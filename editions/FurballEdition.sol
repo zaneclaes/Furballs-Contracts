@@ -99,7 +99,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     return abi.encodePacked(
       '{"name": "', _nameOf(tokenId, number),
         '", "external_url": "https://furballs.com/#/furball/', FurLib.bytesHex(abi.encodePacked(tokenId)),
-        '", "background_color": "', _palette.backgroundColor(FurLib.extractByte(tokenId, 2)),
+        '", "background_color": "', _palette.backgroundColor(uint8(FurLib.extractBytes(tokenId, 2, 1))),
         '", "image": "data:image/svg+xml;base64,', FurLib.encode(_render(tokenId)),
         '", "description": "', _descriptionOf(tokenId),'", "attributes": ',
         '[', attributes, _getAttributes(tokenId),
@@ -160,7 +160,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     bytes memory ret = "";
     bool added = false;
     for (uint8 slot=0; slot<slots.length; slot++) {
-      uint8 idx = _extractSlotNumber(tokenId, slot);
+      uint8 idx = uint8(_extractSlotNumber(tokenId, slot));
       if (idx == 0) continue;
       idx--;
 
@@ -194,8 +194,8 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     return (tokenId, boost);
   }
 
-  function _extractSlotNumber(uint256 tokenId, uint8 slot) internal pure returns(uint8) {
-    return FurLib.extractByte(tokenId, slot + 3);
+  function _extractSlotNumber(uint256 tokenId, uint8 slot) internal pure returns(uint) {
+    return FurLib.extractBytes(tokenId, slot + 3, 1);
   }
 
   function rollRarity(uint32 seed) public returns(uint8) {
@@ -236,21 +236,21 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   }
 
   function _render(uint256 tokenId) internal virtual view returns (bytes memory) {
-    uint8 palette = FurLib.extractByte(tokenId, 1);
+    uint8 palette = uint8(FurLib.extractBytes(tokenId, 1, 1));
     bytes memory ret = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 350 350" style="enable-background:new 0 0 350 350;" xml:space="preserve">';
     for (uint8 slot=0; slot<slots.length; slot++) {
-      uint8 idx = _extractSlotNumber(tokenId, slot);
+      uint8 idx = uint8(_extractSlotNumber(tokenId, slot));
       if (idx == 0) continue;
       ret = abi.encodePacked(ret, renderSlot(slot, idx - 1, palette));
     }
     return abi.encodePacked(ret, '</svg>');
   }
 
-  function renderSlot(uint8 slot, uint8 index, uint8 palette) public view returns(string memory) {
+  function renderSlot(uint8 slot, uint8 idx, uint8 palette) public view returns(string memory) {
     bytes memory svg = '';
     bytes memory tag;
     bytes memory data = _parts[slot].data();
-    uint64 ptr = _pointer(data, index, true) + 3;
+    uint64 ptr = _pointer(data, idx, true) + 3;
     uint8 numTags = uint8(data[ptr - 1]);
     for (uint8 t=0; t < numTags; t++) {
       (ptr, tag) = _renderTag(ptr, data, palette);
@@ -259,10 +259,10 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     return string(svg);
   }
 
-  function _pointer(bytes memory data, uint8 index, bool twoByte) internal pure returns(uint64) {
-    if (index == 0) return 0;
+  function _pointer(bytes memory data, uint8 idx, bool twoByte) internal pure returns(uint64) {
+    if (idx == 0) return 0;
     uint64 ptr = 0;
-    for (uint256 i=0; i<index; i++) {
+    for (uint256 i=0; i<idx; i++) {
       uint16 length = uint16(uint8(data[ptr]));
       if (twoByte) {
         length = (length * 256) + uint16(uint8(data[ptr + 1]));

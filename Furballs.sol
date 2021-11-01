@@ -9,6 +9,7 @@ import "./engines/ILootEngine.sol";
 import "./engines/EngineA.sol";
 import "./utils/FurLib.sol";
 import "./utils/FurDefs.sol";
+import "./utils/FurProxy.sol";
 import "./utils/Moderated.sol";
 import "./utils/Governance.sol";
 import "./Fur.sol";
@@ -67,12 +68,12 @@ contract Furballs is ERC721Enumerable, Moderated {
 
   /// @notice Feeds the furball a snack
   /// @dev Delegates logic to fur
-  function feed(uint256 tokenId, uint32[] memory snackIds, uint16[] memory counts, address actor) external {
-    require(snackIds.length == counts.length, "SIZE");
+  function feed(FurLib.Feeding[] memory feedings, address actor) external {
     address sender = _approvedSender(actor);
+    uint256 len = feedings.length;
 
-    for (uint256 i=0; i<snackIds.length; i++) {
-      fur.purchaseSnack(sender, tokenId, snackIds[i], counts[i]);
+    for (uint256 i=0; i<len; i++) {
+      fur.purchaseSnack(sender, feedings[i].tokenId, feedings[i].snackId, feedings[i].count);
     }
   }
 
@@ -143,7 +144,7 @@ contract Furballs is ERC721Enumerable, Moderated {
     require(slot > 0 && slot <= uint32(furballs[tokenId].inventory.length), "SLOT");
 
     slot -= 1;
-    uint8 stackSize = uint8(furballs[tokenId].inventory[slot] % 256);
+    uint8 stackSize = uint8(furballs[tokenId].inventory[slot] % 0x100);
 
     if (count == 0 || count >= stackSize) {
       // Drop entire stack
@@ -171,8 +172,10 @@ contract Furballs is ERC721Enumerable, Moderated {
       furballs[tokenId].inventory.push(uint256(lootId) * 0x100 + stackSize);
     } else {
       stackSize += uint8(furballs[tokenId].inventory[slotNum - 1] % 0x100);
+      require(stackSize < 0x100, "STACK");
       furballs[tokenId].inventory[slotNum - 1] = uint256(lootId) * 0x100 + stackSize;
     }
+
     furballs[tokenId].weight += engine.weightOf(lootId);
     emit Inventory(tokenId, lootId, 0);
   }
@@ -181,11 +184,11 @@ contract Furballs is ERC721Enumerable, Moderated {
   function _rewardModifiers(
     FurLib.Furball memory fb, uint256 tokenId, address ownerContext, uint256 snackData
   ) internal view returns(FurLib.RewardModifiers memory reward) {
-    uint16 energy = uint16(snackData % 0x10000);
-    uint16 happiness = uint16((snackData / 0x10000) % 0x10000);
+    uint16 energy = uint16(FurLib.extractBytes(snackData, FurLib.SNACK_BYTE_ENERGY, 2));
+    uint16 happiness = uint16(FurLib.extractBytes(snackData, FurLib.SNACK_BYTE_HAPPINESS, 2));
 
     bool context = ownerContext != address(0);
-    uint32 editionIndex = uint32(tokenId % 256);
+    uint32 editionIndex = uint32(tokenId % 0x100);
 
     reward = FurLib.RewardModifiers(
       uint16(100 + fb.rarity),
@@ -363,9 +366,8 @@ contract Furballs is ERC721Enumerable, Moderated {
   /// @dev see https://docs.opensea.io/docs/metadata-standards
   function tokenURI(uint256 tokenId) public view override returns (string memory) {
     require(_exists(tokenId));
-    uint8 editionIndex = uint8(tokenId % 256);
     return string(abi.encodePacked("data:application/json;base64,", FurLib.encode(abi.encodePacked(
-      editions[editionIndex].tokenMetadata(
+      editions[tokenId % 0x100].tokenMetadata(
         engine.attributesMetadata(tokenId),
         tokenId,
         furballs[tokenId].number
@@ -415,6 +417,19 @@ contract Furballs is ERC721Enumerable, Moderated {
   // -----------------------------------------------------------------------------------------------
   // Configuration / Admin
   // -----------------------------------------------------------------------------------------------
+
+  // function setAddresses(FurLib.ProxyAddresses memory addrs) external onlyAdmin {
+  //   address zero = address(0);
+  //   if (addrs.engine != zero) engine = ILootEngine(addrs.engine);
+  //   if (addrs.fur != zero) fur = Fur(addrs.fur);
+  //   if (addrs.furgreement != zero) furgreement = Furgreement(addrs.furgreement);
+  //   if (addrs.governance != zero) governance = Governance(payable(addrs.governance));
+
+  //   if (address(engine) != zero) FurProxy(address(engine)).cache(addrs);
+  //   if (address(fur) != zero) fur.cache(addrs);
+  //   if (address(furgreement) != zero) furgreement.cache(addrs);
+  //   if (address(governance) != zero) governance.cache(addrs);
+  // }
 
   function setFur(address furAddress) external onlyAdmin {
     fur = Fur(furAddress);

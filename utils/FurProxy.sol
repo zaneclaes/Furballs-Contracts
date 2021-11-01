@@ -2,6 +2,7 @@
 pragma solidity ^0.8.6;
 
 import "../Furballs.sol";
+import "./FurLib.sol";
 
 /// @title FurProxy
 /// @author LFG Gaming LLC
@@ -15,27 +16,49 @@ abstract contract FurProxy {
   }
 
   modifier onlyOwner() {
-    require(furballs.owner() == msg.sender, "OWN");
+    require(_permissions(msg.sender) >= FurLib.PERMISSION_OWNER, "OWN");
     _;
   }
 
   modifier onlyAdmin() {
-    require(furballs.isAdmin(msg.sender), "ADMIN");
+    require(_permissions(msg.sender) >= FurLib.PERMISSION_ADMIN, "ADMIN");
     _;
   }
 
   modifier onlyModerators() {
-    require(furballs.isModerator(msg.sender), 'MOD');
+    require(_permissions(msg.sender) >= FurLib.PERMISSION_MODERATOR, "MOD");
+    _;
+  }
+
+  modifier onlyFurballs() {
+    require(msg.sender == address(furballs), "FBL");
     _;
   }
 
   modifier onlyGame() {
-    require(
-      msg.sender == address(furballs) ||
-      msg.sender == address(furballs.engine()) ||
-      msg.sender == address(furballs.furgreement()) ||
-      msg.sender == address(furballs.governance()) ||
-      furballs.isAdmin(msg.sender), "GAME");
+    require(_permissions(msg.sender) >= FurLib.PERMISSION_ADMIN, "GAME");
     _;
+  }
+
+  /// @notice Generalized permissions flag for a given address
+  function _permissions(address addr) internal view returns (uint8) {
+    if (addr == address(0)) return 0;
+    if (addr == address(furballs) ||
+      addr == address(furballs.engine()) ||
+      addr == address(furballs.furgreement()) ||
+      addr == address(furballs.governance()) ||
+      addr == address(furballs.fur())
+    ) {
+      return FurLib.PERMISSION_CONTRACT;
+    }
+    return _userPermissions(addr);
+  }
+
+  function _userPermissions(address addr) internal view returns (uint8) {
+    if (addr == address(0)) return 0;
+    if (addr == furballs.owner()) return FurLib.PERMISSION_OWNER;
+    if (furballs.isAdmin(addr)) return FurLib.PERMISSION_ADMIN;
+    if (furballs.isModerator(addr)) return FurLib.PERMISSION_MODERATOR;
+    return 0;
   }
 }

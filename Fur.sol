@@ -17,8 +17,12 @@ contract Fur is ERC20, FurProxy {
   // tokenId => mapping of fed _snacks
   mapping(uint256 => FurLib.Snack[]) public _snacks;
 
+  // Internal cache for speed.
+  uint256 private _intervalDuration;
+
   constructor(address furballsAddress, uint256 startingBalance) FurProxy(furballsAddress) ERC20("Fur", "FUR") {
     _mint(msg.sender, startingBalance);
+    _intervalDuration = furballs.intervalDuration();
   }
 
   /// @notice FUR can only be minted by furballs doing battle.
@@ -147,8 +151,7 @@ contract Fur is ERC20, FurProxy {
   /// @notice Check if the snack is active; returns 0 if inactive, otherwise the duration
   function _snackTimeRemaning(FurLib.Snack memory snack) internal view returns(uint256) {
     if (snack.fed == 0) return 0;
-    uint256 interval = furballs.intervalDuration();
-    uint256 expiresAt = uint256(snack.fed + (snack.count * snack.duration * interval));
+    uint256 expiresAt = uint256(snack.fed + (snack.count * snack.duration * _intervalDuration));
     return expiresAt <= block.timestamp ? 0 : (expiresAt - block.timestamp);
   }
 
