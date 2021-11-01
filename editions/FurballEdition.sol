@@ -237,7 +237,10 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   function _render(uint256 tokenId) internal virtual view returns (bytes memory) {
     uint8 palette = uint8(FurLib.extractBytes(tokenId, 1, 1));
-    bytes memory ret = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 350 350" style="enable-background:new 0 0 350 350;" xml:space="preserve">';
+    bytes memory ret = abi.encodePacked(
+      '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 350 350" style="enable-background:new 0 0 350 350;" xml:space="preserve">',
+      furballs.engine().render(tokenId)
+    );
     for (uint8 slot=0; slot<slots.length; slot++) {
       uint8 idx = uint8(_extractSlotNumber(tokenId, slot));
       if (idx == 0) continue;

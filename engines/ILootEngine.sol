@@ -55,4 +55,7 @@ interface ILootEngine is IERC165 {
   function onExperience(
     FurLib.Furball memory furball, address owner, uint32 experience
   ) external returns(uint32 totalExp, uint16 level);
+
+  /// @notice Gets called at the beginning of token render; could add underlaid artwork
+  function render(uint256 tokenId) external view returns(string memory);
 }

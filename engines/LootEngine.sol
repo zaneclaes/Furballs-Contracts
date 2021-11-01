@@ -44,6 +44,11 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     return 2;
   }
 
+  /// @notice Gets called at the beginning of token render; could add underlaid artwork
+  function render(uint256 tokenId) external virtual override view returns(string memory) {
+    return "";
+  }
+
   /// @notice Checking the zone may use _require to detect preconditions.
   function enterZone(
     uint256 tokenId, uint32 zone, uint256[] memory team
@@ -254,6 +259,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   function _defineSnack(
     uint32 snackId, uint32 duration, uint16 furCost, uint16 hap, uint16 en
   ) internal {
+    _snacks[snackId].snackId = snackId;
     _snacks[snackId].duration = duration;
     _snacks[snackId].furCost = furCost;
     _snacks[snackId].happiness = hap;
