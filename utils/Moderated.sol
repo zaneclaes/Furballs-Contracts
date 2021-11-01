@@ -20,16 +20,16 @@ abstract contract Moderated is Ownable {
     moderators[mod] = set;
   }
 
-  function isAdmin(address addr) public view returns(bool) {
+  function isAdmin(address addr) public virtual view returns(bool) {
     return owner() == addr || admins[addr];
   }
 
-  function isModerator(address addr) public view returns(bool) {
-    return moderators[addr];
+  function isModerator(address addr) public virtual view returns(bool) {
+    return isAdmin(addr) || moderators[addr];
   }
 
   modifier onlyModerators() {
-    require(isAdmin(msg.sender) || isModerator(msg.sender), 'MOD');
+    require(isModerator(msg.sender), 'MOD');
     _;
   }
 

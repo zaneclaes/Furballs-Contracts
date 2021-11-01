@@ -7,14 +7,13 @@ import "../Furballs.sol";
 import "../utils/FurLib.sol";
 import "../utils/ProxyRegistry.sol";
 import "../utils/Dice.sol";
-import "../utils/Exp.sol";
 import "../utils/Governance.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
 /// @title LootEngine
 /// @author LFG Gaming LLC
 /// @notice Base implementation of the loot engine
-abstract contract LootEngine is ERC165, ILootEngine, Dice, Exp {
+abstract contract LootEngine is ERC165, ILootEngine, Dice {
   Furballs public furballs;
 
   ProxyRegistry private _proxies;
@@ -74,12 +73,12 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, Exp {
 
     // Calculate new level & check for level-up
     uint16 oldLevel = furball.level;
-    uint16 level = expToLevel(totalExp, max);
+    uint16 level = uint16(FurLib.expToLevel(totalExp, max));
     levels = level > oldLevel ? (level - oldLevel) : 0;
 
     if (levels > 0) {
-      Governance gov = furballs.governance();
-      if (address(gov) != address(0)) gov.levelUp(owner, oldLevel, level);
+      // Update community standing
+      furballs.governance().updateMaxLevel(owner, level);
     }
 
     return (totalExp, levels);
@@ -90,7 +89,8 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, Exp {
     FurLib.Furball memory furball, address from, address to
   ) external virtual override onlyFurballs {
     Governance gov = furballs.governance();
-    if (address(gov) != address(0)) gov.transfer(from, to, furball.level);
+    if (from != address(0)) gov.updateAccount(from, furballs.balanceOf(from) - 1);
+    if (to != address(0)) gov.updateAccount(to, furballs.balanceOf(to) + 1);
   }
 
   /// @notice Attempt to upgrade a given piece of loot (item ID)
@@ -171,8 +171,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, Exp {
   function modifyReward(
     FurLib.Furball memory furball,
     FurLib.RewardModifiers memory modifiers,
-    uint32 teamSize,
-    uint64 accountCreatedAt,
+    FurLib.Account memory account,
     bool contextual
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Use temporary variables instead of re-assignment
@@ -196,6 +195,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, Exp {
     }
 
     // Team size boosts!
+    uint256 teamSize = account.permissions < 2 ? account.numFurballs : 0;
     if (teamSize < 10 && teamSize > 1) {
       uint16 amt = uint16(2 * (teamSize - 1));
       expPercent += amt;

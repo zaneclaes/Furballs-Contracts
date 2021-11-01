@@ -27,8 +27,7 @@ interface ILootEngine is IERC165 {
   function modifyReward(
     FurLib.Furball memory furball,
     FurLib.RewardModifiers memory baseModifiers,
-    uint32 teamSize,
-    uint64 accountCreatedAt,
+    FurLib.Account memory account,
     bool contextual
   ) external view returns(FurLib.RewardModifiers memory);
 

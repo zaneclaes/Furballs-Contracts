@@ -6,6 +6,16 @@ pragma solidity ^0.8.6;
 /// @notice Utilities for Furballs
 /// @dev Each of the structs are designed to fit within 256
 library FurLib {
+  // Metadata about a wallet.
+  struct Account {
+    uint64 created;       // First time this account received a furball
+    uint32 numFurballs;   // Number of furballs it currently holds
+    uint32 maxFurballs;   // Max it has ever held
+    uint16 maxLevel;      // Max level of any furball it currently holds
+    uint16 reputation;    // Value assigned by moderators to boost standing
+    uint8 permissions;    // 0 = user, 1 = moderator, 2 = admin, 3 = owner
+  }
+
   // Key data structure given to clients for high-level furball access (furballs.stats)
   struct FurballStats {
     uint256 moves;        // The size of the collection array for this furball, which is move num.
@@ -86,6 +96,25 @@ library FurLib {
     if (byteNum == 11) return 0x10000000000000000000000;
     if (byteNum == 12) return 0x1000000000000000000000000;
     return (0x100 ** byteNum);
+  }
+
+  /// @notice Converts exp into a sqrt-able number.
+  function expToLevel(uint32 exp, uint32 maxExp) internal pure returns(uint256) {
+    exp = exp > maxExp ? maxExp : exp;
+    return sqrt(exp < 100 ? 0 : ((exp + exp - 100) / 100));
+  }
+
+  /// @notice Simple square root function using the Babylonian method
+  function sqrt(uint32 x) internal pure returns(uint256) {
+    if (x < 1) return 0;
+    if (x < 4) return 1;
+    uint z = (x + 1) / 2;
+    uint y = x;
+    while (z < y) {
+      y = z;
+      z = (x / z + z) / 2;
+    }
+    return y;
   }
 
   function trait(string memory traitType, string memory value) internal pure returns (bytes memory) {

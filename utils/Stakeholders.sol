@@ -1,31 +1,26 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.6;
 
-import "./Moderated.sol";
+import "./FurProxy.sol";
 import "./FurLib.sol";
 import "../Furballs.sol";
 
 /// @title Stakeholders
 /// @author LFG Gaming LLC
 /// @notice Tracks "percent ownership" of a smart contract, paying out according to schedule
-abstract contract Stakeholders is Moderated {
-  Furballs public furballs;
-
+/// @dev Acts as a treasury, receiving ETH funds and distributing them to stakeholders
+abstract contract Stakeholders is FurProxy {
   // stakeholder values, in 1/1000th of a percent (received during withdrawls)
   mapping(address => uint64) public stakes;
 
-  // List of stakeholders
+  // List of stakeholders.
   address[] public stakeholders;
 
-  constructor(address furballsAddress) {
-    // Start with a single stakeholder, reserving 10% for referrals.
-    // setStakeholder(msg.sender, 90000);
-    furballs = Furballs(furballsAddress);
-  }
+  // Where any remaining funds should be deposited. Defaults to contract creator.
+  address payable public poolAddress;
 
-  function getStakeholding(address addr) public view returns(uint64) {
-    if (!_hasStakeholder(addr)) return 0;
-    return stakes[addr];
+  constructor(address furballsAddress) FurProxy(furballsAddress) {
+    poolAddress = payable(msg.sender);
   }
 
   function setStakeholder(address addr, uint64 stake) public onlyOwner {
@@ -43,20 +38,19 @@ abstract contract Stakeholders is Moderated {
     stakes[addr] = stake;
   }
 
-  function withdraw() external {
-    require(furballs.isAdmin(msg.sender), 'ADMIN');
+  function withdraw() external onlyAdmin {
     uint256 balance = address(this).balance;
     require(balance >= FurLib.OneHundredPercent, "Insufficient balance");
 
     for (uint256 i=0; i<stakeholders.length; i++) {
       address addr = stakeholders[i];
-      uint256 payout = balance * stakes[addr] / FurLib.OneHundredPercent;
+      uint256 payout = balance * uint256(stakes[addr]) / FurLib.OneHundredPercent;
       if (payout > 0) {
         payable(addr).transfer(payout);
       }
     }
     uint256 remaining = address(this).balance;
-    payable(owner()).transfer(remaining);
+    poolAddress.transfer(remaining);
   }
 
   function _hasStakeholder(address addr) internal view returns(bool) {
