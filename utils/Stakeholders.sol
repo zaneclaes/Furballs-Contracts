@@ -24,7 +24,7 @@ abstract contract Stakeholders is FurProxy {
   }
 
   /// @notice Overflow pool of funds. Contains remaining funds from withdrawl.
-  function setPool(address addr) public onlyAdmin {
+  function setPool(address addr) public onlyOwner {
     poolAddress = payable(addr);
   }
 
@@ -45,7 +45,7 @@ abstract contract Stakeholders is FurProxy {
   }
 
   /// @notice Empties this contract's balance, paying out to stakeholders.
-  function withdraw() external onlyAdmin {
+  function withdraw() external gameAdmin {
     uint256 balance = address(this).balance;
     require(balance >= FurLib.OneHundredPercent, "Insufficient balance");
 

@@ -41,6 +41,6 @@ library MetaData {
   function traitDate(
     string memory traitType, uint256 value
   ) internal pure returns (bytes memory) {
-    return traitNumberDisplay(traitType, "number", value);
+    return traitNumberDisplay(traitType, "date", value);
   }
 }

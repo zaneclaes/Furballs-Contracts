@@ -115,7 +115,7 @@ contract Furballs is ERC721Enumerable, Moderated {
   /// @dev This allows for gameplay expansion, i.e., new game modes
   /// @param tokenId The furball to gain the loot
   /// @param lootId The loot ID being sent
-  function pickup(uint256 tokenId, uint128 lootId) external onlyGame {
+  function pickup(uint256 tokenId, uint128 lootId) external gameAdmin {
     _pickup(tokenId, lootId);
   }
 
@@ -124,7 +124,7 @@ contract Furballs is ERC721Enumerable, Moderated {
   /// @param tokenId The furball
   /// @param lootId The item to drop
   /// @param count the number of that item to drop
-  function drop(uint256 tokenId, uint128 lootId, uint8 count) external onlyGame {
+  function drop(uint256 tokenId, uint128 lootId, uint8 count) external gameAdmin {
     _drop(tokenId, lootId, count);
   }
 
@@ -486,13 +486,16 @@ contract Furballs is ERC721Enumerable, Moderated {
 
     // All senders are validated thru engine logic.
     uint8 permissions = uint8(engine.approveSender(sender));
+
+    // Zero-permissions indicate unauthorized.
     require(permissions > 0, "PLR");
 
     return (sender, permissions);
   }
 
-  modifier onlyGame() {
-    require(msg.sender == address(engine) || isAdmin(msg.sender), "ENG");
+  modifier gameAdmin() {
+    (address sender, uint8 permissions) = _approvedSender(address(0));
+    require(permissions >= FurLib.PERMISSION_ADMIN, "ENG");
     _;
   }
 }

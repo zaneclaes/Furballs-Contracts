@@ -15,28 +15,26 @@ abstract contract FurProxy {
     furballs = Furballs(furballsAddress);
   }
 
+  /// @notice Proxied from permissions lookup
   modifier onlyOwner() {
     require(_permissions(msg.sender) >= FurLib.PERMISSION_OWNER, "OWN");
     _;
   }
 
-  modifier onlyAdmin() {
-    require(_permissions(msg.sender) >= FurLib.PERMISSION_ADMIN, "ADMIN");
+  /// @notice Permission modifier for moderators (covers owner)
+  modifier gameAdmin() {
+    require(_permissions(msg.sender) >= FurLib.PERMISSION_ADMIN, "GAME");
     _;
   }
 
-  modifier onlyModerators() {
+  /// @notice Permission modifier for moderators (covers admin)
+  modifier gameModerators() {
     require(_permissions(msg.sender) >= FurLib.PERMISSION_MODERATOR, "MOD");
     _;
   }
 
   modifier onlyFurballs() {
     require(msg.sender == address(furballs), "FBL");
-    _;
-  }
-
-  modifier onlyGame() {
-    require(_permissions(msg.sender) >= FurLib.PERMISSION_ADMIN, "GAME");
     _;
   }
 

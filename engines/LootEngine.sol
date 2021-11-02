@@ -18,30 +18,41 @@ import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   ProxyRegistry private _proxies;
 
+  // An address which may act on behalf of the owner (company)
+  address public companyWalletProxy;
+
   // snackId to "definition" of the snack
   mapping(uint32 => FurLib.Snack) private _snacks;
 
   uint32 maxExperience = 2010000;
 
-  constructor(address furballsAddress, address proxyRegistry) FurProxy(furballsAddress) {
-    _proxies = ProxyRegistry(proxyRegistry);
+  constructor(
+    address furballsAddress, address tradeProxy, address companyProxy
+  ) FurProxy(furballsAddress) {
+    _proxies = ProxyRegistry(tradeProxy);
+    companyWalletProxy = companyProxy;
 
     _defineSnack(0x100, 24    ,  250, 15, 0);
     _defineSnack(0x200, 24 * 3,  750, 20, 0);
     _defineSnack(0x300, 24 * 7, 1500, 25, 0);
   }
 
-  // /// @notice Allows admins to configure the snack store.
-  // function setSnack(
-  //   uint32 snackId, uint32 duration, uint16 furCost, uint16 hap, uint16 en
-  // ) external onlyAdmin {
-  //   _defineSnack(snackId, duration, furCost, hap, en);
-  // }
+  /// @notice Allows admins to configure the snack store.
+  function setSnack(
+    uint32 snackId, uint32 duration, uint16 furCost, uint16 hap, uint16 en
+  ) external gameAdmin {
+    _defineSnack(snackId, duration, furCost, hap, en);
+  }
 
   /// @notice Loot can have different weight to help prevent over-powering a furball
   /// @dev Each point of weight can be offset by a point of energy; the result reduces luck
   function weightOf(uint128 lootId) external virtual override pure returns (uint16) {
     return 2;
+  }
+
+  /// @notice Gets called for Metadata
+  function furballDescription(uint256 tokenId) external virtual override view returns (string memory) {
+    return "";
   }
 
   /// @notice Gets called at the beginning of token render; could add underlaid artwork
@@ -68,6 +79,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   /// @notice Allow a player to play? Throws on error if not.
   /// @dev This is core gameplay security logic
   function approveSender(address sender) external virtual override view onlyFurballs returns(uint) {
+    if (sender == companyWalletProxy && sender != address(0)) return FurLib.PERMISSION_OWNER;
     return _permissions(sender);
   }
 
@@ -234,7 +246,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
       abi.encodePacked(
         MetaData.traitValue("Level", stats.definition.level),
         MetaData.traitNumber("Edition", (tokenId % 0x100) + 1),
-        MetaData.traitValue("Loot", stats.definition.inventory.length),
+        MetaData.traitNumber("Loot", stats.definition.inventory.length),
         MetaData.traitValue("Rarity", stats.definition.rarity),
         MetaData.traitValue("EXP Rate", stats.expRate),
         MetaData.traitValue("FUR Rate", stats.furRate),

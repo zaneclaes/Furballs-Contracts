@@ -25,13 +25,13 @@ contract Fur is ERC20, FurProxy {
   }
 
   /// @notice FUR can only be minted by furballs doing battle.
-  function earn(address addr, uint256 amount) external onlyGame {
+  function earn(address addr, uint256 amount) external gameAdmin {
     if (amount == 0) return;
     _mint(addr, amount);
   }
 
   /// @notice FUR can be spent by Furballs, or by the LootEngine (shopping, in the future)
-  function spend(address addr, uint256 amount) external onlyGame {
+  function spend(address addr, uint256 amount) external gameAdmin {
     _burn(addr, amount);
   }
 
@@ -66,7 +66,7 @@ contract Fur is ERC20, FurProxy {
   /// @dev Delegated logic from Furballs;
   function purchaseMint(
     address from, uint8 permissions, address to, IFurballEdition edition
-  ) external onlyGame returns (bool) {
+  ) external gameAdmin returns (bool) {
     require(edition.maxMintable(to) > 0, "LIVE");
     uint32 cnt = edition.count();
 
@@ -85,7 +85,7 @@ contract Fur is ERC20, FurProxy {
   function purchaseUpgrade(
     FurLib.RewardModifiers memory modifiers,
     address from, uint8 permissions, uint256 tokenId, uint128 lootId, uint8 chances
-  ) external onlyGame returns(uint128) {
+  ) external gameAdmin returns(uint128) {
     address owner = furballs.ownerOf(tokenId);
 
     // _gift will throw if cannot gift or cannot afford cost
@@ -98,7 +98,7 @@ contract Fur is ERC20, FurProxy {
   /// @dev Delegated logic from Furballs
   function purchaseSnack(
     address from, uint8 permissions, uint256 tokenId, uint32 snackId, uint16 count
-  ) external onlyGame {
+  ) external gameAdmin {
     FurLib.Snack memory snack = furballs.engine().getSnack(snackId);
     require(snack.count > 0, "COUNT");
     require(snack.fed == 0, "FED");

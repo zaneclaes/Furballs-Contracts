@@ -54,13 +54,13 @@ contract Governance is Stakeholders {
   }
 
   /// @notice Update metadata for main contractURI
-  function setMeta(string memory nameVal, string memory descVal) external onlyAdmin {
+  function setMeta(string memory nameVal, string memory descVal) external gameAdmin {
     metaName = nameVal;
     metaDescription = descVal;
   }
 
   /// @notice The transaction fee can be adjusted
-  function setTransactionFee(uint16 basisPoints) external onlyGame {
+  function setTransactionFee(uint16 basisPoints) external gameAdmin {
     transactionFee = basisPoints;
   }
 
@@ -89,19 +89,19 @@ contract Governance is Stakeholders {
   }
 
   /// @notice Moderators may assign reputation to accounts
-  function setReputation(address addr, uint16 rep) external onlyModerators {
+  function setReputation(address addr, uint16 rep) external gameModerators {
     _account[addr].reputation = rep;
   }
 
   /// @notice Tracks the max level an account has *obtained*
-  function updateMaxLevel(address addr, uint16 level) external onlyGame {
+  function updateMaxLevel(address addr, uint16 level) external gameAdmin {
     if (_account[addr].maxLevel >= level) return;
     _account[addr].maxLevel = level;
     _updateStanding(addr);
   }
 
   /// @notice Recompute max stats for the account.
-  function updateAccount(address addr, uint256 numFurballs) external onlyGame {
+  function updateAccount(address addr, uint256 numFurballs) external gameAdmin {
     FurLib.Account memory acc = _account[addr];
 
     // Recompute account permissions for internal rewards

@@ -58,4 +58,7 @@ interface ILootEngine is IERC165 {
 
   /// @notice Gets called at the beginning of token render; could add underlaid artwork
   function render(uint256 tokenId) external view returns(string memory);
+
+  /// @notice The loot engine can add descriptions to furballs metadata
+  function furballDescription(uint256 tokenId) external view returns (string memory);
 }
