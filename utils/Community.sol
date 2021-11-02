@@ -38,12 +38,13 @@
 pragma solidity ^0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "./FurLib.sol";
 
 /// @title Community
 /// @author LFG Gaming LLC
 /// @notice This is a derived token; it represents a weighted balance of the ERC721 token (Furballs).
 /// @dev There is no fiscal interest in Community. This is simply a measured value of community voice.
-abstract contract Community is ERC20 {
+contract Community is ERC20 {
     /// @notice A record of each accounts delegate
     mapping(address => address) private _delegates;
 
@@ -52,6 +53,8 @@ abstract contract Community is ERC20 {
         uint32 fromBlock;
         uint96 votes;
     }
+
+    constructor() ERC20("FurballsCommunity", "FBLS") { }
 
     /// @notice A record of votes checkpoints for each account, by index
     mapping(address => mapping(uint32 => Checkpoint)) public checkpoints;
@@ -93,6 +96,18 @@ abstract contract Community is ERC20 {
         address current = _delegates[delegator];
         return current == address(0) ? delegator : current;
     }
+
+
+      /// @notice Sets the addresses' standing directly
+      function update(FurLib.Account memory account, address addr) external returns (uint256) {
+        require(false, 'NEED SECURITY');
+        // uint256 balance = balanceOf(addr);
+        // if (standing > balance) {
+        //   _mint(addr, standing - balance);
+        // } else if (standing < balance) {
+        //   _burn(addr, balance - standing);
+        // }
+      }
 
     /**
      * @notice Adapted from `_transferTokens()` in `Comp.sol` to update delegate votes.

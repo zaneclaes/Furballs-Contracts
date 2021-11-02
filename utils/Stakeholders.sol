@@ -23,6 +23,10 @@ abstract contract Stakeholders is FurProxy {
     poolAddress = payable(msg.sender);
   }
 
+  function setPool(address addr) public onlyAdmin {
+    poolAddress = payable(addr);
+  }
+
   function setStakeholder(address addr, uint64 stake) public onlyOwner {
     if (!_hasStakeholder(addr)) {
       stakeholders.push(addr);

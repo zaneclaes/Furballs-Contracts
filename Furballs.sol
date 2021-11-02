@@ -38,7 +38,7 @@ contract Furballs is ERC721Enumerable, Moderated {
   // mapping(uint256 => mapping(uint128 => uint32)) public slots;
 
   // tokenId => all rewards assigned to that Furball
-  mapping(uint256 => FurLib.Rewards[]) public collect;
+  mapping(uint256 => FurLib.Rewards) public collect;
 
   // The amount of time over which FUR/EXP is accrued (usually 3600=>1hour); used with test servers
   uint256 public intervalDuration;
@@ -60,8 +60,11 @@ contract Furballs is ERC721Enumerable, Moderated {
   /// @notice Mints a new furball from the current edition (if there are any remaining)
   /// @dev Limits and fees are set by IFurballEdition
   function mint(address[] memory to, uint8 editionIndex, address actor) external {
+    (address sender, uint8 permissions) = _approvedSender(actor);
+    require(to.length == 1 || permissions >= FurLib.PERMISSION_MODERATOR, "MULT");
+
     for (uint8 i=0; i<to.length; i++) {
-      fur.purchaseMint(_approvedSender(actor), to[i], editions[editionIndex]);
+      fur.purchaseMint(sender, permissions, to[i], editions[editionIndex]);
       _spawn(to[i], editionIndex, 0);
     }
   }
@@ -69,11 +72,11 @@ contract Furballs is ERC721Enumerable, Moderated {
   /// @notice Feeds the furball a snack
   /// @dev Delegates logic to fur
   function feed(FurLib.Feeding[] memory feedings, address actor) external {
-    address sender = _approvedSender(actor);
+    (address sender, uint8 permissions) = _approvedSender(actor);
     uint256 len = feedings.length;
 
     for (uint256 i=0; i<len; i++) {
-      fur.purchaseSnack(sender, feedings[i].tokenId, feedings[i].snackId, feedings[i].count);
+      fur.purchaseSnack(sender, permissions, feedings[i].tokenId, feedings[i].snackId, feedings[i].count);
     }
   }
 
@@ -82,11 +85,11 @@ contract Furballs is ERC721Enumerable, Moderated {
   /// @param tokenIds The furballs which should start exploring
   /// @param zone The explore zone (otherwize, zero for battle mode)
   function playMany(uint256[] memory tokenIds, uint32 zone, address actor) external {
-    address sender = _approvedSender(actor);
+    (address sender, uint8 permissions) = _approvedSender(actor);
 
     for (uint256 i=0; i<tokenIds.length; i++) {
       // Run reward collection
-      _collect(tokenIds[i], sender);
+      _collect(tokenIds[i], sender, permissions);
 
       // Set new zone (if allowed; enterZone may throw)
       furballs[tokenIds[i]].zone = uint32(engine.enterZone(tokenIds[i], zone, tokenIds));
@@ -100,8 +103,8 @@ contract Furballs is ERC721Enumerable, Moderated {
     uint256 tokenId, uint128 lootId, uint8 chances, address actor
   ) external {
     // Attempt upgrade (random chance).
-    uint128 up = fur.purchaseUpgrade(
-      _baseModifiers(tokenId), _approvedSender(actor), tokenId, lootId, chances);
+    (address sender, uint8 permissions) = _approvedSender(actor);
+    uint128 up = fur.purchaseUpgrade(_baseModifiers(tokenId), sender, permissions, tokenId, lootId, chances);
     if (up != 0) {
       _drop(tokenId, lootId, 1);
       _pickup(tokenId, up);
@@ -215,13 +218,13 @@ contract Furballs is ERC721Enumerable, Moderated {
 
   /// @notice Ends the current explore/battle and dispenses rewards
   /// @param tokenId The furball
-  function _collect(uint256 tokenId, address sender) internal {
+  function _collect(uint256 tokenId, address sender, uint8 permissions) internal {
     FurLib.Furball memory furball = furballs[tokenId];
     address owner = ownerOf(tokenId);
 
     // The engine is allowed to force furballs into exploration mode
     // This allows it to end a battle early, which will be necessary in PvP
-    require(owner == sender || address(engine) == sender, "OWN");
+    require(owner == sender || permissions >= FurLib.PERMISSION_ADMIN, "OWN");
 
     // Scale duration to the time the edition has been live
     if (furball.last == 0) {
@@ -229,25 +232,31 @@ contract Furballs is ERC721Enumerable, Moderated {
       require(launchedAt > 0 && launchedAt < uint64(block.timestamp), "PRE");
       furball.last = furball.birth > launchedAt ? furball.birth : launchedAt;
     }
-    FurLib.Rewards memory res = FurLib.Rewards(
-      uint32(uint64(block.timestamp) - furball.last), 0,0,0,0);
 
     // Calculate modifiers to be used with this collection
     FurLib.RewardModifiers memory mods =
       _rewardModifiers(furball, tokenId, owner, fur.cleanSnacks(tokenId));
 
+    // Reset the collection for this furball
+    uint32 duration = uint32(uint64(block.timestamp) - furball.last);
+    collect[tokenId].fur = 0;
+    collect[tokenId].experience = 0;
+    collect[tokenId].levels = 0;
+
     if (mods.zone >= 0x10000) {
       // Battle zones earn FUR and assign to the owner
-      res.fur = uint32(_calculateReward(res.duration, FurLib.FUR_PER_INTERVAL, mods.furPercent));
-      // ~28k gas to calc and assign FUR
-      if (res.fur > 0) {
-        fur.earn(owner, res.fur);
+      uint32 f = uint32(_calculateReward(duration, FurLib.FUR_PER_INTERVAL, mods.furPercent));
+      if (f > 0) {
+        fur.earn(owner, f);
+        collect[tokenId].fur = f;
       }
     } else {
       // Explore zones earn EXP...
-      res.experience = uint32(_calculateReward(res.duration, FurLib.EXP_PER_INTERVAL, mods.expPercent));
-      (uint32 totalExp, uint16 levels) = engine.onExperience(furballs[tokenId], owner, res.experience);
-      res.levels = levels;
+      uint32 exp = uint32(_calculateReward(duration, FurLib.EXP_PER_INTERVAL, mods.expPercent));
+      (uint32 totalExp, uint16 levels) = engine.onExperience(furballs[tokenId], owner, exp);
+
+      collect[tokenId].experience = exp;
+      collect[tokenId].levels = levels;
 
       furballs[tokenId].level += levels;
       furballs[tokenId].experience = totalExp;
@@ -255,17 +264,19 @@ contract Furballs is ERC721Enumerable, Moderated {
 
     // Generate loot and assign to furball
     uint32 interval = uint32(intervalDuration);
-    res.loot = engine.dropLoot(res.duration / interval, mods);
-    if (res.loot > 0) _pickup(tokenId, res.loot);
-
-    // Stash this as the last play response (~30k gas)
-    collect[tokenId].push(res);
-
-    // Emit the reward ID for frontend
-    emit Collection(tokenId, collect[tokenId].length);
+    uint128 lootId = engine.dropLoot(duration / interval, mods);
+    collect[tokenId].loot = lootId;
+    if (lootId > 0) {
+      _pickup(tokenId, lootId);
+    }
 
     // Timestamp the last interaction for next cycle.
     furballs[tokenId].last = uint64(block.timestamp);
+
+    // Emit the reward ID for frontend
+    uint32 moves = furball.moves + 1;
+    furballs[tokenId].moves = moves;
+    emit Collection(tokenId, moves);
   }
 
   /// @notice Mints a new furball
@@ -335,7 +346,6 @@ contract Furballs is ERC721Enumerable, Moderated {
       );
 
     return FurLib.FurballStats(
-      collect[tokenId].length,
       uint16(_calculateReward(intervalDuration, FurLib.EXP_PER_INTERVAL, mods.expPercent)),
       uint16(_calculateReward(intervalDuration, FurLib.FUR_PER_INTERVAL, mods.furPercent)),
       mods,
@@ -462,7 +472,7 @@ contract Furballs is ERC721Enumerable, Moderated {
 
   /// @notice Handles auth of msg.sender against cheating and/or banning.
   /// @dev Pass nonzero sender to act as a proxy against the furgreement
-  function _approvedSender(address sender) internal view returns (address) {
+  function _approvedSender(address sender) internal view returns (address, uint8) {
     // No sender (for gameplay) is approved until the necessary parts are online
     require(_isReady(), "!RDY");
 
@@ -475,7 +485,10 @@ contract Furballs is ERC721Enumerable, Moderated {
     }
 
     // All senders are validated thru engine logic.
-    return engine.approveSender(sender);
+    uint8 permissions = uint8(engine.approveSender(sender));
+    require(permissions > 0, "PLR");
+
+    return (sender, permissions);
   }
 
   modifier onlyGame() {

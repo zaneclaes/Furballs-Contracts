@@ -9,7 +9,7 @@ import "./FurLib.sol";
 /// @author LFG Gaming LLC
 /// @notice Meta-tracker for Furballs; looks at the ecosystem (metadata, wallet counts, etc.)
 /// @dev Shares is an ERC20; stakeholders is a payable
-contract Governance is Community, Stakeholders {
+contract Governance is Stakeholders {
   /// @notice Where transaction fees are deposited
   address payable public treasury;
 
@@ -31,7 +31,9 @@ contract Governance is Community, Stakeholders {
   // List of all addresses which have ever owned a furball.
   address[] public accounts;
 
-  constructor(address furballsAddress) Stakeholders(furballsAddress) ERC20("FurballsCommunity", "FBLS") {
+  Community public community;
+
+  constructor(address furballsAddress) Stakeholders(furballsAddress) {
     treasury = payable(this);
   }
 
@@ -63,8 +65,13 @@ contract Governance is Community, Stakeholders {
   }
 
   /// @notice The treasury can be changed in only rare circumstances.
-  function setTreasury(address payable treasuryAddress) external onlyOwner {
-    treasury = treasuryAddress;
+  function setTreasury(address treasuryAddress) external onlyOwner {
+    treasury = payable(treasuryAddress);
+  }
+
+  /// @notice The treasury can be changed in only rare circumstances.
+  function setCommunity(address communityAddress) external onlyOwner {
+    community = Community(communityAddress);
   }
 
   /// @notice public accessor updates permissions
@@ -72,6 +79,13 @@ contract Governance is Community, Stakeholders {
     FurLib.Account memory acc = _account[addr];
     acc.permissions = _userPermissions(addr);
     return acc;
+  }
+
+  /// @notice Public function allowing manual update of standings
+  function updateStandings(address[] memory addrs) public {
+    for (uint32 i=0; i<addrs.length; i++) {
+      _updateStanding(addrs[i]);
+    }
   }
 
   /// @notice Moderators may assign reputation to accounts
@@ -110,20 +124,18 @@ contract Governance is Community, Stakeholders {
   function _updateStanding(address addr) internal {
     uint256 standing = 0;
     FurLib.Account memory acc = _account[addr];
-    uint32 num = acc.numFurballs;
-    if (num > 0) {
-      standing = num * 10 + acc.maxLevel + acc.reputation;
-    }
-    _setStanding(addr, standing);
-  }
 
-  /// @notice Sets the addresses' standing directly
-  function _setStanding(address addr, uint256 standing) internal {
-    uint256 balance = balanceOf(addr);
-    if (standing > balance) {
-      _mint(addr, standing - balance);
-    } else if (standing < balance) {
-      _burn(addr, balance - standing);
+    if (address(community) != address(0)) {
+      // If community is patched in later...
+      standing = community.update(acc, addr);
+    } else {
+      // Default computation of standing
+      uint32 num = acc.numFurballs;
+      if (num > 0) {
+        standing = num * 10 + acc.maxLevel + acc.reputation;
+      }
     }
+
+    _account[addr].standing = uint16(standing);
   }
 }

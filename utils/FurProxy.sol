@@ -42,7 +42,10 @@ abstract contract FurProxy {
 
   /// @notice Generalized permissions flag for a given address
   function _permissions(address addr) internal view returns (uint8) {
-    if (addr == address(0)) return 0;
+    // User permissions will return "zero" quickly if this didn't come from a wallet.
+    uint8 permissions = _userPermissions(addr);
+    if (permissions > 0) return permissions;
+
     if (addr == address(furballs) ||
       addr == address(furballs.engine()) ||
       addr == address(furballs.furgreement()) ||
@@ -51,14 +54,19 @@ abstract contract FurProxy {
     ) {
       return FurLib.PERMISSION_CONTRACT;
     }
-    return _userPermissions(addr);
+    return 0;
   }
 
   function _userPermissions(address addr) internal view returns (uint8) {
+    // Invalid addresses include contracts an non-wallet interactions, which have no permissions
     if (addr == address(0)) return 0;
+    uint256 size;
+    assembly { size := extcodesize(addr) }
+    if (addr != tx.origin || size != 0) return 0;
+
     if (addr == furballs.owner()) return FurLib.PERMISSION_OWNER;
     if (furballs.isAdmin(addr)) return FurLib.PERMISSION_ADMIN;
     if (furballs.isModerator(addr)) return FurLib.PERMISSION_MODERATOR;
-    return 0;
+    return FurLib.PERMISSION_USER;
   }
 }

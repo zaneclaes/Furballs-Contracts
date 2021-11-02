@@ -44,7 +44,7 @@ interface ILootEngine is IERC165 {
   function canProxyTrades(address owner, address operator) external view returns(bool);
 
   /// @notice Authorization mechanics are upgradeable to account for security patches
-  function approveSender(address sender) external view returns(address);
+  function approveSender(address sender) external view returns(uint);
 
   /// @notice Called when a Furball is traded to update delegate logic
   function onTrade(

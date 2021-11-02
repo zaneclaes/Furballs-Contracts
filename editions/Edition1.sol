@@ -31,6 +31,7 @@ contract Edition1 is FurballEdition {
     if (count < (maxAdoptable + 3000)) return 160000;
     if (count < (maxAdoptable + 4000)) return 320000;
     if (count < (maxAdoptable + 4750)) return 640000;
-    return 10000000;
+    if (count < (maxAdoptable + 4900)) return 10000000;
+    return 100000000;
   }
 }

@@ -67,16 +67,8 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
 
   /// @notice Allow a player to play? Throws on error if not.
   /// @dev This is core gameplay security logic
-  function approveSender(address sender) external virtual override view onlyFurballs returns(address) {
-    // Engine itself is allowed to act as a player so it may adjust game state
-    if (sender == address(this)) return sender;
-
-    // Ensure the sender is a wallet, or that it is an approved proxy
-    uint256 size;
-    assembly { size := extcodesize(sender) }
-    require(sender == tx.origin && size == 0, "PLR");
-
-    return sender;
+  function approveSender(address sender) external virtual override view onlyFurballs returns(uint) {
+    return _permissions(sender);
   }
 
   /// @notice Calculates new level for experience
@@ -121,11 +113,13 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
 
     require(rarity > 0 && rarity < 3, "RARITY");
-    uint32 chance = (rarity == 1 ? 75 : 25) * uint32(chances);
+    uint32 chance = (rarity == 1 ? 75 : 25) * uint32(chances) + uint32(modifiers.luckPercent * 10);
+
+    // Even with many chances, odds are capped:
+    if (chance > 750) chance = 750;
+
     uint32 threshold = (FurLib.Max32 / 1000) * (1000 - chance);
-    uint256 rolled =
-      (uint256(roll(modifiers.expPercent)) * uint256(modifiers.luckPercent))
-      / 100;
+    uint256 rolled = (uint256(roll(modifiers.expPercent)));
 
     return rolled < threshold ? 0 : _packLoot(rarity + 1, stat);
   }

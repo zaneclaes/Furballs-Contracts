@@ -20,8 +20,7 @@ contract Fur is ERC20, FurProxy {
   // Internal cache for speed.
   uint256 private _intervalDuration;
 
-  constructor(address furballsAddress, uint256 startingBalance) FurProxy(furballsAddress) ERC20("Fur", "FUR") {
-    _mint(msg.sender, startingBalance);
+  constructor(address furballsAddress) FurProxy(furballsAddress) ERC20("Fur", "FUR") {
     _intervalDuration = furballs.intervalDuration();
   }
 
@@ -66,7 +65,7 @@ contract Fur is ERC20, FurProxy {
   /// @notice Pay any necessary fees to mint a furball
   /// @dev Delegated logic from Furballs;
   function purchaseMint(
-    address from, address to, IFurballEdition edition
+    address from, uint8 permissions, address to, IFurballEdition edition
   ) external onlyGame returns (bool) {
     require(edition.maxMintable(to) > 0, "LIVE");
     uint32 cnt = edition.count();
@@ -76,7 +75,7 @@ contract Fur is ERC20, FurProxy {
 
     if (requiresPurchase) {
       // _gift will throw if cannot gift or cannot afford cost
-      _gift(from, to, edition.purchaseFur());
+      _gift(from, permissions, to, edition.purchaseFur());
     }
     return requiresPurchase;
   }
@@ -85,13 +84,12 @@ contract Fur is ERC20, FurProxy {
   /// @dev Delegated logic from Furballs
   function purchaseUpgrade(
     FurLib.RewardModifiers memory modifiers,
-    address from, uint256 tokenId, uint128 lootId, uint8 chances
+    address from, uint8 permissions, uint256 tokenId, uint128 lootId, uint8 chances
   ) external onlyGame returns(uint128) {
     address owner = furballs.ownerOf(tokenId);
-    require(chances < 10 && chances > 0, "CHANCE");
 
     // _gift will throw if cannot gift or cannot afford cost
-    _gift(from, owner, 500 * uint256(chances));
+    _gift(from, permissions, owner, 500 * uint256(chances));
 
     return furballs.engine().upgradeLoot(modifiers, owner, lootId, chances);
   }
@@ -99,14 +97,14 @@ contract Fur is ERC20, FurProxy {
   /// @notice Attempts to purchase a snack using templates found in the engine
   /// @dev Delegated logic from Furballs
   function purchaseSnack(
-    address from, uint256 tokenId, uint32 snackId, uint16 count
+    address from, uint8 permissions, uint256 tokenId, uint32 snackId, uint16 count
   ) external onlyGame {
     FurLib.Snack memory snack = furballs.engine().getSnack(snackId);
     require(snack.count > 0, "COUNT");
     require(snack.fed == 0, "FED");
 
     // _gift will throw if cannot gift or cannot afford costQ
-    _gift(from, furballs.ownerOf(tokenId), snack.furCost * count);
+    _gift(from, permissions, furballs.ownerOf(tokenId), snack.furCost * count);
 
     uint256 snackData = _cleanSnack(tokenId, snack.snackId);
     uint32 existingSnackNumber = uint32(snackData / 0x100000000);
@@ -158,11 +156,11 @@ contract Fur is ERC20, FurProxy {
   /// @notice Enforces (requires) only admins/game may give gifts
   /// @param to Whom is this being sent to?
   /// @return If this is a gift or not.
-  function _gift(address from, address to, uint256 furCost) internal returns(bool) {
+  function _gift(address from, uint8 permissions, address to, uint256 furCost) internal returns(bool) {
     bool isGift = to != from;
 
     // Only admins or game engine can send gifts (to != self), which are always free.
-    require(!isGift || address(furballs.engine()) == from || furballs.isAdmin(from), "GIFT");
+    require(!isGift || permissions >= FurLib.PERMISSION_ADMIN, "GIFT");
 
     if (!isGift && furCost > 0) {
       _burn(from, furCost);

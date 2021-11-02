@@ -13,12 +13,12 @@ library FurLib {
     uint32 maxFurballs;   // Max it has ever held
     uint16 maxLevel;      // Max level of any furball it currently holds
     uint16 reputation;    // Value assigned by moderators to boost standing
+    uint16 standing;      // Computed current standing
     uint8 permissions;    // 0 = user, 1 = moderator, 2 = admin, 3 = owner
   }
 
   // Key data structure given to clients for high-level furball access (furballs.stats)
   struct FurballStats {
-    uint256 moves;        // The size of the collection array for this furball, which is move num.
     uint16 expRate;
     uint16 furRate;
     RewardModifiers modifiers;
@@ -28,7 +28,6 @@ library FurLib {
 
   // The response from a single play session indicating rewards
   struct Rewards {
-    uint32 duration;
     uint16 levels;
     uint32 experience;
     uint32 fur;
@@ -47,6 +46,7 @@ library FurLib {
     uint64 birth;         // Timestamp of furball creation
     uint64 trade;         // Timestamp of last furball trading wallets
     uint64 last;          // Timestamp of last action (battle/explore)
+    uint32 moves;         // The size of the collection array for this furball, which is move num.
     uint256[] inventory;  // IDs of items in inventory
   }
 
@@ -88,6 +88,7 @@ library FurLib {
 
   uint32 public constant Max32 = type(uint32).max;
 
+  uint8 public constant PERMISSION_USER = 1;
   uint8 public constant PERMISSION_MODERATOR = 2;
   uint8 public constant PERMISSION_ADMIN = 4;
   uint8 public constant PERMISSION_OWNER = 5;
