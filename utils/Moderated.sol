@@ -15,6 +15,11 @@ abstract contract Moderated is Ownable {
     admins[addr] = set;
   }
 
+  /// @notice Moderated ownables may not be renounced (only transferred)
+  function renounceOwnership() public override onlyOwner {
+    require(false, 'OWN');
+  }
+
   function setModerator(address mod, bool set) external onlyAdmin {
     require(mod != address(0));
     moderators[mod] = set;

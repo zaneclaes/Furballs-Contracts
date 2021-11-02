@@ -23,10 +23,12 @@ abstract contract Stakeholders is FurProxy {
     poolAddress = payable(msg.sender);
   }
 
+  /// @notice Overflow pool of funds. Contains remaining funds from withdrawl.
   function setPool(address addr) public onlyAdmin {
     poolAddress = payable(addr);
   }
 
+  /// @notice Changes payout percentages.
   function setStakeholder(address addr, uint64 stake) public onlyOwner {
     if (!_hasStakeholder(addr)) {
       stakeholders.push(addr);
@@ -42,6 +44,7 @@ abstract contract Stakeholders is FurProxy {
     stakes[addr] = stake;
   }
 
+  /// @notice Empties this contract's balance, paying out to stakeholders.
   function withdraw() external onlyAdmin {
     uint256 balance = address(this).balance;
     require(balance >= FurLib.OneHundredPercent, "Insufficient balance");
@@ -57,6 +60,7 @@ abstract contract Stakeholders is FurProxy {
     poolAddress.transfer(remaining);
   }
 
+  /// @notice Check
   function _hasStakeholder(address addr) internal view returns(bool) {
     for (uint256 i=0; i<stakeholders.length; i++) {
       if (stakeholders[i] == addr) {
