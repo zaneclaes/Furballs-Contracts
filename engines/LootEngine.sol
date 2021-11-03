@@ -127,6 +127,9 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     require(rarity > 0 && rarity < 3, "RARITY");
     uint32 chance = (rarity == 1 ? 75 : 25) * uint32(chances) + uint32(modifiers.luckPercent * 10);
 
+    // Remove the 100% from loot, with 5% minimum chance
+    chance = chance > 1050 ? (chance - 1000) : 50;
+
     // Even with many chances, odds are capped:
     if (chance > 750) chance = 750;
 
