@@ -15,6 +15,11 @@ abstract contract FurProxy {
     furballs = Furballs(furballsAddress);
   }
 
+  /// @notice Allow upgrading contract links
+  function setFurballs(address addr) external onlyOwner {
+    furballs = Furballs(addr);
+  }
+
   /// @notice Proxied from permissions lookup
   modifier onlyOwner() {
     require(_permissions(msg.sender) >= FurLib.PERMISSION_OWNER, "OWN");

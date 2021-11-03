@@ -57,6 +57,8 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   uint8 private _numBackgrounds;
 
+  address private _owner;
+
   mapping(uint8 => mapping(uint8 => uint8[])) private _options;
 
   function modifyReward(
@@ -70,6 +72,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   ) {
     furballs = Furballs(furballsAddress);
     _palette = IFurballPalette(paletteAddress);
+    _owner = msg.sender;
 
     _numPalettes = _palette.numPalettes();
     _numBackgrounds = _palette.numBackgroundColors();
@@ -106,6 +109,11 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   // -----------------------------------------------------------------------------------------------
   // Admin
   // -----------------------------------------------------------------------------------------------
+
+  /// @notice Allow upgrading contract links
+  function setFurballs(address addr) external onlyAdmin {
+    furballs = Furballs(addr);
+  }
 
   function setPart(address addr, uint8 i) public onlyAdmin {
     IFurballPart part = IFurballPart(addr);
@@ -431,7 +439,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   }
 
   modifier onlyAdmin() {
-    require(furballs.isAdmin(msg.sender));
+    require((address(furballs) == address(0) && _owner == msg.sender) || furballs.isAdmin(msg.sender));
     _;
   }
 }
