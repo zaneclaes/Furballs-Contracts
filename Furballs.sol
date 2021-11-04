@@ -34,9 +34,6 @@ contract Furballs is ERC721Enumerable, Moderated {
   // tokenId => furball data
   mapping(uint256 => FurLib.Furball) public furballs;
 
-  // tokenId => item type => slot number for that item
-  // mapping(uint256 => mapping(uint128 => uint32)) public slots;
-
   // tokenId => all rewards assigned to that Furball
   mapping(uint256 => FurLib.Rewards) public collect;
 
@@ -428,19 +425,6 @@ contract Furballs is ERC721Enumerable, Moderated {
   // Configuration / Admin
   // -----------------------------------------------------------------------------------------------
 
-  // function setAddresses(FurLib.ProxyAddresses memory addrs) external onlyAdmin {
-  //   address zero = address(0);
-  //   if (addrs.engine != zero) engine = ILootEngine(addrs.engine);
-  //   if (addrs.fur != zero) fur = Fur(addrs.fur);
-  //   if (addrs.furgreement != zero) furgreement = Furgreement(addrs.furgreement);
-  //   if (addrs.governance != zero) governance = Governance(payable(addrs.governance));
-
-  //   if (address(engine) != zero) FurProxy(address(engine)).cache(addrs);
-  //   if (address(fur) != zero) fur.cache(addrs);
-  //   if (address(furgreement) != zero) furgreement.cache(addrs);
-  //   if (address(governance) != zero) governance.cache(addrs);
-  // }
-
   function setFur(address furAddress) external onlyAdmin {
     fur = Fur(furAddress);
   }
@@ -495,7 +479,7 @@ contract Furballs is ERC721Enumerable, Moderated {
 
   modifier gameAdmin() {
     (address sender, uint8 permissions) = _approvedSender(address(0));
-    require(permissions >= FurLib.PERMISSION_ADMIN, "ENG");
+    require(permissions >= FurLib.PERMISSION_ADMIN, "GAME");
     _;
   }
 }

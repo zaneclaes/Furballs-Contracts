@@ -17,7 +17,7 @@ contract Governance is Stakeholders {
   uint16 public transactionFee = 250;
 
   /// @notice Used in contractURI for Furballs itself.
-  string public metaName = "Furballs";
+  string public metaName = "Furballs.com (Official)";
 
   /// @notice Used in contractURI for Furballs itself.
   string public metaDescription =

@@ -24,16 +24,9 @@ contract Fur is ERC20, FurProxy {
     _intervalDuration = furballs.intervalDuration();
   }
 
-  /// @notice FUR can only be minted by furballs doing battle.
-  function earn(address addr, uint256 amount) external gameAdmin {
-    if (amount == 0) return;
-    _mint(addr, amount);
-  }
-
-  /// @notice FUR can be spent by Furballs, or by the LootEngine (shopping, in the future)
-  function spend(address addr, uint256 amount) external gameAdmin {
-    _burn(addr, amount);
-  }
+  // -----------------------------------------------------------------------------------------------
+  // Public
+  // -----------------------------------------------------------------------------------------------
 
   /// @notice Returns the snacks currently applied to a Furball
   function snacks(uint256 tokenId) external view returns(FurLib.Snack[] memory) {
@@ -60,6 +53,21 @@ contract Fur is ERC20, FurProxy {
     }
 
     return (hap * 0x10000) + (en);
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  // GameAdmin
+  // -----------------------------------------------------------------------------------------------
+
+  /// @notice FUR can only be minted by furballs doing battle.
+  function earn(address addr, uint256 amount) external gameAdmin {
+    if (amount == 0) return;
+    _mint(addr, amount);
+  }
+
+  /// @notice FUR can be spent by Furballs, or by the LootEngine (shopping, in the future)
+  function spend(address addr, uint256 amount) external gameAdmin {
+    _burn(addr, amount);
   }
 
   /// @notice Pay any necessary fees to mint a furball
@@ -118,6 +126,10 @@ contract Fur is ERC20, FurProxy {
       _snacks[tokenId].push(snack);
     }
   }
+
+  // -----------------------------------------------------------------------------------------------
+  // Internal
+  // -----------------------------------------------------------------------------------------------
 
   /// @notice Both removes inactive _snacks from a token and searches for a specific snack Id index
   /// @dev Both at once saves some size & ensures that the _snacks are frequently cleaned.

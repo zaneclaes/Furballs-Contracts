@@ -78,14 +78,6 @@ library FurLib {
     uint16 count;
   }
 
-  // Key addresses cached internally
-  // struct ProxyAddresses {
-  //   address engine;
-  //   address fur;
-  //   address furgreement;
-  //   address governance;
-  // }
-
   uint32 public constant Max32 = type(uint32).max;
 
   uint8 public constant PERMISSION_USER = 1;
