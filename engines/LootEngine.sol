@@ -246,21 +246,14 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   ) external virtual override view returns(bytes memory) {
     FurLib.FurballStats memory stats = furballs.stats(tokenId, false);
     return abi.encodePacked(
-      abi.encodePacked(
-        MetaData.traitValue("Level", stats.definition.level),
-        MetaData.traitNumber("Edition", (tokenId % 0x100) + 1),
-        MetaData.traitNumber("Loot", stats.definition.inventory.length),
-        MetaData.traitValue("Rarity", stats.definition.rarity),
-        MetaData.traitValue("EXP Rate", stats.expRate),
-        MetaData.traitValue("FUR Rate", stats.furRate),
-        MetaData.traitBoost("EXP Boost", stats.modifiers.expPercent),
-        MetaData.traitBoost("FUR Boost", stats.modifiers.furPercent),
-        MetaData.traitDate("Last Move", stats.definition.last)
-      ),
-      abi.encodePacked(
-        MetaData.traitDate("Acquired", stats.definition.trade),
-        MetaData.traitDate("Birthday", stats.definition.birth)
-      )
+      MetaData.traitValue("Level", stats.definition.level),
+      MetaData.traitValue("Rare Genes Boost", stats.definition.rarity),
+      MetaData.traitNumber("Edition", (tokenId % 0x100) + 1),
+      MetaData.traitNumber("Unique Loot Collected", stats.definition.inventory.length),
+      MetaData.traitBoost("EXP Boost", stats.modifiers.expPercent),
+      MetaData.traitBoost("FUR Boost", stats.modifiers.furPercent),
+      MetaData.traitDate("Acquired", stats.definition.trade),
+      MetaData.traitDate("Birthday", stats.definition.birth)
     );
   }
 

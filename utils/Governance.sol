@@ -43,6 +43,7 @@ contract Governance is Stakeholders {
     return string(abi.encodePacked("data:application/json;base64,", FurLib.encode(abi.encodePacked(
       '{"name": "', metaName,'", "description": "', metaDescription,'"',
       ', "external_link": "https://furballs.com"',
+      ', "image": "https://furballs.com/images/pfp.png"',
       ', "seller_fee_basis_points": ', FurLib.uint2str(transactionFee),
       ', "fee_recipient": "0x', FurLib.bytesHex(abi.encodePacked(treasury)), '"}'
     ))));
