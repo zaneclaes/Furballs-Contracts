@@ -44,13 +44,6 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   IFurballPaths[] private _paths;
 
-  uint32[4] private rarities = [
-    FurLib.Max32 / 1000 * 848, // 9%
-    FurLib.Max32 / 1000 * 938, // 5%
-    FurLib.Max32 / 1000 * 988, // 1%
-    FurLib.Max32 / 1000 * 998  // 0.2%
-  ];
-
   Furballs public furballs;
 
   uint8 private _numPalettes;
@@ -218,18 +211,21 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   // -----------------------------------------------------------------------------------------------
   // Rarity / Rolls
   // -----------------------------------------------------------------------------------------------
+  uint private constant rarities1 = type(uint32).max / 1000 * 848; // 9%
+  uint private constant rarities2 = type(uint32).max / 1000 * 938; // 5%
+  uint private constant rarities3 = type(uint32).max / 1000 * 988; // 1%
+  uint private constant rarities4 = type(uint32).max / 1000 * 998; // 0.2%
 
-  function rollRarity(uint32 seed) public returns(uint8) {
+  function rollRarity(uint32 seed) internal returns(uint8) {
     uint32 rolled = roll(seed);
-    for (uint8 r=4; r>0; r--) {
-      if (rolled > rarities[r - 1]) {
-        return r;
-      }
-    }
+    if (rolled > rarities4) { return 4; }
+    if (rolled > rarities3) { return 3; }
+    if (rolled > rarities2) { return 2; }
+    if (rolled > rarities1) { return 1; }
     return 0;
   }
 
-  function rollSlot(uint32 seed, uint8 slot, uint8 rarity) public returns(uint256, uint8) {
+  function rollSlot(uint32 seed, uint8 slot, uint8 rarity) internal returns(uint256, uint8) {
     rarity = rarity > 0 ? rarity : rollRarity(seed);
     uint8[] memory opts = _options[slot][rarity];
     uint8 numOpts = uint8(opts.length);

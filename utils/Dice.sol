@@ -11,7 +11,7 @@ abstract contract Dice {
 
   /// @notice A PRNG which re-seeds itself with block information & another PRNG
   /// @dev This is unit-tested with monobit (frequency) and longestRunOfOnes
-  function roll(uint32 seed) public returns (uint32) {
+  function roll(uint32 seed) internal returns (uint32) {
     LAST = uint32(uint256(keccak256(
       abi.encodePacked(block.timestamp, block.basefee, _prng(LAST == 0 ? seed : LAST)))
     ));
