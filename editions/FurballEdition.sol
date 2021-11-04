@@ -35,7 +35,7 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
 
   IFurballPalette private _palette;
 
-  mapping(address => uint16) internal _whitelist;
+  mapping(address => uint256) internal _whitelist;
 
   mapping(uint256 => string) public names;
 
@@ -154,9 +154,11 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
     liveAt = at;
   }
 
-  function addToWhitelist(address[] memory addresses, uint16 num) public onlyAdmin {
-    for (uint256 i=0; i<addresses.length; i++) {
-      _whitelist[addresses[i]] = num;
+  function addToWhitelist(address[] calldata addresses, uint256 num) public onlyAdmin {
+    unchecked {
+      for (uint256 i=0; i<addresses.length; i++) {
+        _whitelist[addresses[i]] = num;
+      }
     }
   }
 
@@ -230,7 +232,8 @@ abstract contract FurballEdition is ERC165, IFurballEdition, Dice {
   function rollSlot(uint32 seed, uint8 slot, uint8 rarity) public returns(uint256, uint8) {
     rarity = rarity > 0 ? rarity : rollRarity(seed);
     uint8[] memory opts = _options[slot][rarity];
-    if (opts.length == 0) {
+    uint8 numOpts = uint8(opts.length);
+    if (numOpts == 0) {
       if (rarity >= 1) {
         // Rolled a rare attribute, but there were no options. Re-try this roll.
         return rollSlot(seed, slot, rarity - 1);

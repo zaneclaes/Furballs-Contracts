@@ -20,10 +20,14 @@ abstract contract Dice {
 
   /// @notice A PRNG based upon a Lehmer (Park-Miller) method
   /// @dev https://en.wikipedia.org/wiki/Lehmer_random_number_generator
-  function _prng(uint32 seed) internal view returns (uint32) {
-    uint64 nonce = seed == 0 ? uint32(block.timestamp) : seed;
-    uint64 product = uint64(nonce) * 48271;
-    uint32 x = uint32((product % 0x7fffffff) + (product >> 31));
-    return (x & 0x7fffffff) + (x >> 31);
+  function _prng(uint32 seed) internal view returns (uint256) {
+    unchecked {
+      uint256 nonce = seed == 0 ? uint32(block.timestamp) : seed;
+      return (nonce * 48271) % 0x7fffffff;
+    }
+    // uint64 nonce = seed == 0 ? uint32(block.timestamp) : seed;
+    // uint64 product = uint64(nonce) * 48271;
+    // uint32 x = uint32((product % 0x7fffffff) + (product >> 31));
+    // return (x & 0x7fffffff) + (x >> 31);
   }
 }

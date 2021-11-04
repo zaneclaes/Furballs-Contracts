@@ -21,7 +21,7 @@ contract Edition1 is FurballEdition {
     if (furballs.isAdmin(addr)) return withFur ? 75 : 50;
     bool live = liveAt != 0 && liveAt <= uint64(block.timestamp);
     uint16 min = live ? (withFur ? 15 : 5) : 0;
-    return _whitelist[addr] > min ? _whitelist[addr] : min;
+    return _whitelist[addr] > min ? uint16(_whitelist[addr]) : min;
   }
 
   function purchaseFur() public override view returns(uint256) {
