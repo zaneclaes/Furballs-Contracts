@@ -17,13 +17,63 @@ contract Furgreement is EIP712, FurProxy {
 
   mapping(address => PlayMove) public pendingMoves;
 
+  mapping(uint256 => uint256) public zones;
+
+  mapping(uint32 => uint256) public tokenQueue;
+
+  uint256 token0;
+
+  uint32 public tokenIdx;
+
   // A "move to be made" in the sig queue
   struct PlayMove {
-    uint32 zone;
     uint256[] tokenIds;
+    uint32 zone;
   }
 
+  struct TokenAction {
+    uint32 zone;
+    address sender;
+  }
+
+  mapping(uint256 => TokenAction) public actions;
+
   constructor(address furballsAddress) EIP712("Furgreement", "1") FurProxy(furballsAddress) { }
+
+  function move(uint256 tokenId, uint32 zone) external {
+    actions[tokenId].zone = zone;
+    actions[tokenId].sender = msg.sender;
+    // require(furballs.ownerOf(tokenId) == address(msg.sender), "OWNER");
+    // tokenQueue.push(tokenId);
+    // zones[tokenId] = zone + 1;
+    // token0 = tokenId;
+    // tokenQueue[tokenIdx] = tokenId;
+    // tokenIdx = tokenIdx + 1;
+  }
+
+  function moves(uint256 idx) external returns(TokenAction memory ret) {
+    if (idx == 1) return TokenAction(0, address(0));
+    return ret;
+  }
+
+  function pushMove(uint256[] calldata tokenIds, uint32 zone) external {
+    addressQueue.push(msg.sender);
+    pendingMoves[msg.sender].tokenIds = tokenIds;
+    pendingMoves[msg.sender].zone = zone;
+  }
+
+  function processMoves() external {
+    uint len = addressQueue.length;
+    uint tq = 0;
+    while(tq < len) {
+      // tq = tq - 1;
+      address sender = addressQueue[tq];
+      PlayMove memory move = pendingMoves[sender];
+      furballs.playMany(move.tokenIds, move.zone, sender);
+      tq = tq + 1;
+      // addressQueue.pop();
+    }
+  }
 
   /// @notice Proxy playMany to Furballs contract
   function playFromSignature(
