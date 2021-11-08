@@ -25,9 +25,5 @@ abstract contract Dice {
       uint256 nonce = seed == 0 ? uint32(block.timestamp) : seed;
       return (nonce * 48271) % 0x7fffffff;
     }
-    // uint64 nonce = seed == 0 ? uint32(block.timestamp) : seed;
-    // uint64 product = uint64(nonce) * 48271;
-    // uint32 x = uint32((product % 0x7fffffff) + (product >> 31));
-    // return (x & 0x7fffffff) + (x >> 31);
   }
 }

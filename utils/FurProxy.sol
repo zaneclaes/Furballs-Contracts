@@ -22,19 +22,19 @@ abstract contract FurProxy {
 
   /// @notice Proxied from permissions lookup
   modifier onlyOwner() {
-    require(_permissions(msg.sender) >= FurLib.PERMISSION_OWNER, "OWN");
+    require(_permissionCheck(msg.sender) >= FurLib.PERMISSION_OWNER, "OWN");
     _;
   }
 
   /// @notice Permission modifier for moderators (covers owner)
   modifier gameAdmin() {
-    require(_permissions(msg.sender) >= FurLib.PERMISSION_ADMIN, "GAME");
+    require(_permissionCheck(msg.sender) >= FurLib.PERMISSION_ADMIN, "GAME");
     _;
   }
 
   /// @notice Permission modifier for moderators (covers admin)
   modifier gameModerators() {
-    require(_permissions(msg.sender) >= FurLib.PERMISSION_MODERATOR, "MOD");
+    require(_permissionCheck(msg.sender) >= FurLib.PERMISSION_MODERATOR, "MOD");
     _;
   }
 
@@ -44,11 +44,29 @@ abstract contract FurProxy {
   }
 
   /// @notice Generalized permissions flag for a given address
+  function _permissionCheck(address addr) internal view returns (uint) {
+    if(addr != address(0)) {
+      uint256 size;
+      assembly { size := extcodesize(addr) }
+      if (addr == tx.origin && size == 0) {
+        return _userPermissions(addr);
+      }
+    }
+    return _contractPermissions(addr);
+  }
+
+  /// @notice Permission lookup (for loot engine approveSender)
   function _permissions(address addr) internal view returns (uint8) {
     // User permissions will return "zero" quickly if this didn't come from a wallet.
-    uint8 permissions = _userPermissions(addr);
-    if (permissions > 0) return permissions;
+    if (addr == address(0)) return 0;
+    uint256 size;
+    assembly { size := extcodesize(addr) }
+    if (size != 0) return 0;
 
+    return _userPermissions(addr);
+  }
+
+  function _contractPermissions(address addr) internal view returns (uint) {
     if (addr == address(furballs) ||
       addr == address(furballs.engine()) ||
       addr == address(furballs.furgreement()) ||
@@ -63,10 +81,6 @@ abstract contract FurProxy {
   function _userPermissions(address addr) internal view returns (uint8) {
     // Invalid addresses include contracts an non-wallet interactions, which have no permissions
     if (addr == address(0)) return 0;
-    uint256 size;
-    assembly { size := extcodesize(addr) }
-    if (addr != tx.origin || size != 0) return 0;
-
     if (addr == furballs.owner()) return FurLib.PERMISSION_OWNER;
     if (furballs.isAdmin(addr)) return FurLib.PERMISSION_ADMIN;
     if (furballs.isModerator(addr)) return FurLib.PERMISSION_MODERATOR;

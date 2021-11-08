@@ -10,6 +10,7 @@ import "../utils/ProxyRegistry.sol";
 import "../utils/Dice.sol";
 import "../utils/Governance.sol";
 import "../utils/MetaData.sol";
+import "../zones/ZoneLib.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
 /// @title LootEngine
@@ -80,6 +81,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   /// @dev This is core gameplay security logic
   function approveSender(address sender) external virtual override view onlyFurballs returns(uint) {
     if (sender == companyWalletProxy && sender != address(0)) return FurLib.PERMISSION_OWNER;
+
     return _permissions(sender);
   }
 
@@ -184,6 +186,14 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     FurLib.Account memory account,
     bool contextual
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
+    // Check for zero-outs first
+    if (contextual && ZoneLib.poolZone(furball.zone) > 0) {
+      modifiers.furPercent = 0;
+      modifiers.expPercent = 0;
+      modifiers.luckPercent = 0;
+      return modifiers;
+    }
+
     // Use temporary variables instead of re-assignment
     uint16 energy = modifiers.energyPoints;
     uint16 weight = furball.weight;

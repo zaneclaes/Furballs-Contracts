@@ -2,104 +2,96 @@
 pragma solidity ^0.8.6;
 
 import "./Furballs.sol";
+import "./Fur.sol";
 import "./utils/FurProxy.sol";
+// import "./IPlayRound.sol";
+import "./l2/L2Lib.sol";
+import "./l2/Bank.sol";
+import "./zones/IZone.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 
-/// @title Furballs
+/// @title Furgreement
 /// @author LFG Gaming LLC
 /// @notice Has permissions to act as a proxy to the Furballs contract
-/// @dev https://soliditydeveloper.com/ecrecover
 contract Furgreement is EIP712, FurProxy {
-  mapping(address => uint256) private nonces;
+  // Tracker of wallet balances
+  Bank public bank;
 
-  address[] public addressQueue;
+  // Map the zone number to the index in the zones array + 1
+  mapping(uint32 => IZone) public zones;
 
-  mapping(address => PlayMove) public pendingMoves;
+  // List of zones in above mapping
+  uint[] public zoneNumbers;
 
-  mapping(uint256 => uint256) public zones;
-
-  mapping(uint32 => uint256) public tokenQueue;
-
-  uint256 token0;
-
-  uint32 public tokenIdx;
-
-  // A "move to be made" in the sig queue
-  struct PlayMove {
-    uint256[] tokenIds;
-    uint32 zone;
+  constructor(
+    address furballsAddress, address bankAddress
+  ) EIP712("Furgreement", "1") FurProxy(furballsAddress) {
+    bank = Bank(bankAddress);
   }
 
-  struct TokenAction {
-    uint32 zone;
-    address sender;
+  /// @notice Public accessor to get a required zone
+  function getZone(uint32 zoneNum) internal returns(IZone) {
+    return _getZone(zoneNum);
   }
 
-  mapping(uint256 => TokenAction) public actions;
+  /// @notice Lets game/admin change the cost to enter the pool
+  function setZone(address zoneAddr) external gameAdmin {
+    IZone zone = IZone(zoneAddr);
+    uint32 zoneNum = uint32(zone.getZoneNumber());
+    address existing = address(zones[zoneNum]);
 
-  constructor(address furballsAddress) EIP712("Furgreement", "1") FurProxy(furballsAddress) { }
-
-  function move(uint256 tokenId, uint32 zone) external {
-    actions[tokenId].zone = zone;
-    actions[tokenId].sender = msg.sender;
-    // require(furballs.ownerOf(tokenId) == address(msg.sender), "OWNER");
-    // tokenQueue.push(tokenId);
-    // zones[tokenId] = zone + 1;
-    // token0 = tokenId;
-    // tokenQueue[tokenIdx] = tokenId;
-    // tokenIdx = tokenIdx + 1;
+    if (existing == address(0)) {
+      zoneNumbers.push(zoneNum);
+    }
+    zones[zoneNum] = zone;
   }
 
-  function moves(uint256 idx) external returns(TokenAction memory ret) {
-    if (idx == 1) return TokenAction(0, address(0));
-    return ret;
+  /// @notice Enters the pool zone with several furballs
+  function poolEnter(uint256[] calldata tokenIds, uint32 poolZone) external payable {
+    // Load the zone
+    IZone zone = _getZone(poolZone);
+
+    // Collect fees & check entrance
+    if (msg.value > 0) bank.deposit(msg.sender, msg.value);
+    require(bank.balance(msg.sender) >= zone.getCost(), 'COST');
+
+    // Exit the prior zone and enter the pool
+    furballs.playMany(tokenIds, poolZone, msg.sender);
   }
 
-  function pushMove(uint256[] calldata tokenIds, uint32 zone) external {
-    addressQueue.push(msg.sender);
-    pendingMoves[msg.sender].tokenIds = tokenIds;
-    pendingMoves[msg.sender].zone = zone;
-  }
-
-  function processMoves() external {
-    uint len = addressQueue.length;
-    uint tq = 0;
-    while(tq < len) {
-      // tq = tq - 1;
-      address sender = addressQueue[tq];
-      PlayMove memory move = pendingMoves[sender];
-      furballs.playMany(move.tokenIds, move.zone, sender);
-      tq = tq + 1;
-      // addressQueue.pop();
+  /// @notice Direct payout from a pool, triggered by admins
+  /// @dev Calculated off-chain
+  function poolPayoutFur(
+    address[] calldata recipients,
+    uint256[] calldata furAmounts,
+    uint256 cost
+  ) external gameAdmin {
+    for (uint i=0; i<recipients.length; i++) {
+      uint withdrawn = bank.withdraw(recipients[i], cost);
+      if (withdrawn >= (cost / 2)) {
+        furballs.fur().earn(recipients[i], furAmounts[i]);
+      }
     }
   }
 
-  /// @notice Proxy playMany to Furballs contract
-  function playFromSignature(
-    bytes memory signature,
-    address owner,
-    PlayMove memory move,
-    uint256 deadline
-  ) external {
-    bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(
-      keccak256("playMany(address owner,PlayMove memory move,uint256 nonce,uint256 deadline)"),
-      owner,
-      move,
-      nonces[owner],
-      deadline
-    )));
+  /// @notice Allows players to top-up balance
+  /// @dev Pass zero address to apply to self
+  function deposit(address to) external payable {
+    require(msg.value > 0, 'VALUE');
+    bank.deposit(to == address(0) ? msg.sender : to, msg.value);
+  }
 
-    address signer = ECDSA.recover(digest, signature);
-    require(signer == owner, "playMany: invalid signature");
-    require(signer != address(0), "ECDSA: invalid signature");
+  /// @notice Sends payout to the treasury
+  function withdraw() external gameAdmin {
+    uint256 balance = address(this).balance;
+    furballs.governance().treasury().transfer(balance);
+  }
 
-    require(block.timestamp < deadline, "playMany: signed transaction expired");
-    nonces[owner]++;
-
-    if (pendingMoves[owner].tokenIds.length == 0) {
-      addressQueue.push(owner);
-    }
-    pendingMoves[owner] = move;
+  /// @notice Helper to load a required zone
+  function _getZone(uint32 zoneNum) internal returns(IZone) {
+    IZone zone = zones[zoneNum];
+    require(address(zone) != address(0), 'ZONE');
+    return zone;
   }
 }
