@@ -80,7 +80,10 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   /// @notice Allow a player to play? Throws on error if not.
   /// @dev This is core gameplay security logic
   function approveSender(address sender) external virtual override view onlyFurballs returns(uint) {
-    if (sender == companyWalletProxy && sender != address(0)) return FurLib.PERMISSION_OWNER;
+    if (sender == address(0)) return 0;
+
+    if (sender == companyWalletProxy) return FurLib.PERMISSION_OWNER;
+    if (sender == address(furballs.furgreement())) return FurLib.PERMISSION_CONTRACT;
 
     return _permissions(sender);
   }
@@ -186,14 +189,6 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     FurLib.Account memory account,
     bool contextual
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
-    // Check for zero-outs first
-    if (contextual && ZoneLib.poolZone(furball.zone) > 0) {
-      modifiers.furPercent = 0;
-      modifiers.expPercent = 0;
-      modifiers.luckPercent = 0;
-      return modifiers;
-    }
-
     // Use temporary variables instead of re-assignment
     uint16 energy = modifiers.energyPoints;
     uint16 weight = furball.weight;
@@ -243,11 +238,11 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
       }
     }
 
-    modifiers.expPercent = expPercent;
     modifiers.furPercent = furPercent;
     modifiers.luckPercent = luckPercent;
+    modifiers.expPercent = expPercent;
 
-    return modifiers;
+    return furballs.furgreement().modifyReward(furball, modifiers, account, contextual);
   }
 
   /// @notice OpenSea metadata

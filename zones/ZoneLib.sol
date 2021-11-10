@@ -14,8 +14,7 @@ library ZoneLib {
 
   /// @notice Checks if this is a pool zone, returning the pool type
   function poolZone(uint32 zone) internal pure returns(uint256) {
-    if (zone > 0x10000) zone = zone / 0x10000;
-    if ((zone % 0x100) != 1) return 0;
-    return (zone / 0x100) + 1;
+    if (zone < 0x10000) return 0;
+    return (zone / 0x10000) + 1;
   }
 }

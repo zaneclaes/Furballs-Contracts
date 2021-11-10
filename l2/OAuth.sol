@@ -11,35 +11,42 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 /// @author LFG Gaming LLC
 /// @notice Uses EIP712 to authorize a user for an L2 API client
 contract OAuth is EIP712, FurProxy {
-  // The payload of a token
-  struct Token {
-    address owner;
-    uint32 access;
-    uint64 deadline;
-  }
-
   constructor(
     address furballsAddress
-  ) EIP712("FurballsOAuthToken", "1") FurProxy(furballsAddress) { }
+  ) EIP712("FurOAuth", "1") FurProxy(furballsAddress) { }
 
-  /// @notice Authorize a token for the owner
+  /// @notice Authentication just checks a valid token; returns error codes
+  function authenticate(L2Lib.OAuthToken calldata token) external view returns(uint) {
+    return _authenticate(token);
+  }
+
+  /// @notice Authorization uses require statements and returns an account with permissions
   function authorize(
-    bytes calldata signature,
-    Token calldata token
+    L2Lib.OAuthToken calldata token
   ) external view returns(FurLib.Account memory) {
+    uint errorCode = _authenticate(token);
+
+    require(errorCode != 1, "authorize: invalid signature");
+    require(errorCode != 2, "ECDSA: invalid signature");
+    require(errorCode != 3, "authorize: signed token expired");
+
+    return furballs.governance().getAccount(token.owner);
+  }
+
+  /// @notice Internal authentication function, returns error codes
+  function _authenticate(L2Lib.OAuthToken calldata token) internal view returns(uint) {
     bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(
-      keccak256("Token(address owner,uint32 access,uint64 deadline)"),
+      keccak256("OAuthToken(address owner,uint32 access,uint64 deadline)"),
       token.owner,
       token.access,
       token.deadline
     )));
 
-    address signer = ECDSA.recover(digest, signature);
-    require(signer == token.owner, "authorize: invalid signature");
-    require(signer != address(0), "ECDSA: invalid signature");
-    require(token.deadline == 0 || block.timestamp < token.deadline,
-      "authorize: signed token expired");
+    address signer = ECDSA.recover(digest, token.signature);
+    if (signer != token.owner) return 1;
+    if (signer == address(0)) return 2;
+    if (token.deadline != 0 && block.timestamp >= token.deadline) return 3;
 
-    return furballs.governance().getAccount(token.owner);
+    return 0;
   }
 }

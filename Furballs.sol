@@ -472,7 +472,7 @@ contract Furballs is ERC721Enumerable, Moderated {
     uint8 permissions = uint8(engine.approveSender(sender));
 
     // Zero-permissions indicate unauthorized.
-    require(permissions > 0, "PLR");
+    require(permissions > 0, FurLib.bytesHex(abi.encodePacked(sender)));
 
     return (sender, permissions);
   }
