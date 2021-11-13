@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 contract OAuth is EIP712, FurProxy {
   constructor(
     address furballsAddress
-  ) EIP712("FurOAuth", "1") FurProxy(furballsAddress) { }
+  ) EIP712("FurballsLogin", "1") FurProxy(furballsAddress) { }
 
   /// @notice Authentication just checks a valid token; returns error codes
   function authenticate(L2Lib.OAuthToken calldata token) external view returns(uint) {

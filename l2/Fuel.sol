@@ -9,14 +9,21 @@ import "../utils/FurProxy.sol";
 contract Fuel is FurProxy {
   mapping(address => uint256) public tank;
 
+  uint256 public conversionRate = 100000000000;
+
   constructor(address furballsAddress) FurProxy(furballsAddress) { }
+
+  /// @notice Change ETH/Fuel ratio
+  function setConversion(uint256 rate) external gameModerators {
+    conversionRate = rate;
+  }
 
   /// @notice Direct deposit function
   /// @dev Pass zero address to apply to self
   function deposit(address to) external payable {
     require(msg.value > 0, "VALUE");
     if (to == address(0)) to = msg.sender;
-    tank[to] += msg.value;
+    tank[to] += msg.value / conversionRate;
   }
 
   /// @notice Sends payout to the treasury
