@@ -21,8 +21,6 @@ contract Furgreement is EIP712, FurProxy {
   // Simple, fast check for a single allowed proxy...
   address private _job;
 
-  mapping(address => L2Lib.TimekeeperResult) public timekeeperResult;
-
   constructor(
     address furballsAddress, address fuelAddress
   ) EIP712("Furgreement", "1") FurProxy(furballsAddress) {
@@ -37,19 +35,65 @@ contract Furgreement is EIP712, FurProxy {
   ) external allowedProxy {
     for (uint i=0; i<tkRequests.length; i++) {
       uint errorCode = _runTimekeeper(tkRequests[i], signatures[i]);
-
-      timekeeperResult[tkRequests[i].sender] =
-        L2Lib.TimekeeperResult(uint64(block.timestamp), uint8(errorCode));
-
       require(errorCode == 0, FurLib.uint2str(errorCode));
     }
+  }
+
+  /// @notice Public validation function can check that the signature was valid ahead of time
+  function validateTimekeeper(
+    L2Lib.TimekeeperRequest memory tkRequest,
+    bytes memory signature
+  ) public view returns (uint) {
+    return _validateTimekeeper(tkRequest, signature);
   }
 
   /// @notice Single Timekeeper run for one player; validates EIP-712 request
   function _runTimekeeper(
     L2Lib.TimekeeperRequest memory tkRequest,
     bytes memory signature
-  ) internal returns (uint8) {
+  ) internal returns (uint) {
+    // Check the EIP-712 signature.
+    uint errorCode = _validateTimekeeper(tkRequest, signature);
+    if (errorCode != 0) return errorCode;
+
+    // Burn tickets, etc.
+    uint spentFuel = fuel.burn(tkRequest.sender, tkRequest.tickets);
+    // if (spentFuel < (tkRequest.tickets / 2)) return 10;
+
+    require(tkRequest.furReal >= tkRequest.furGained, "FUR");
+    if (tkRequest.furReal > 0) {
+      furballs.fur().earn(tkRequest.sender, tkRequest.furReal);
+    }
+    if (tkRequest.furSpent > 0) {
+      // Spend the FUR required for these actions
+      furballs.fur().spend(tkRequest.sender, tkRequest.furSpent);
+
+      if (tkRequest.mintEdition > 0) {
+        // Edition is one-indexed, to allow for null
+        address[] memory to = new address[](1);
+        to[0] = tkRequest.sender;
+
+        // "Gift" the mint (FUR purchase should have been done above)
+        furballs.mint(to, tkRequest.mintEdition - 1, address(this));
+      }
+
+      // Each round represents a furball
+      _resolveRounds(tkRequest.rounds, tkRequest.sender);
+    }
+
+    // Change zonens happens at the very end of the turn, so buffs can take effect
+    if (tkRequest.movements.length > 1) {
+      _changeZones(tkRequest.movements, tkRequest.sender);
+    }
+
+    return errorCode; // no error
+  }
+
+  /// @notice Validate a timekeeper request
+  function _validateTimekeeper(
+    L2Lib.TimekeeperRequest memory tkRequest,
+    bytes memory signature
+  ) internal view returns (uint) {
     bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(
       keccak256("TimekeeperRequest(address sender,uint32 fuel,uint32 fur_gained,uint32 fur_spent,uint8 mint_edition,uint64 deadline)"),
       tkRequest.sender,
@@ -65,34 +109,7 @@ contract Furgreement is EIP712, FurProxy {
     if (signer == address(0)) return 2;
     if (tkRequest.deadline != 0 && block.timestamp >= tkRequest.deadline) return 3;
 
-    Fur fur = furballs.fur();
-    uint spentFuel = fuel.burn(tkRequest.sender, tkRequest.tickets);
-    if (spentFuel < (tkRequest.tickets / 2)) return 10;
-
-    if (tkRequest.furGained > 0) fur.earn(tkRequest.sender, tkRequest.furGained);
-    if (tkRequest.furSpent > 0) {
-      // Spend the FUR required for these actions
-      fur.spend(tkRequest.sender, tkRequest.furSpent);
-
-      if (tkRequest.mintEdition > 0) {
-        // Edition is one-indexed, to allow for null
-        address[] memory to = new address[](1);
-        to[0] = tkRequest.sender;
-
-        // "Gift" the mint (FUR purchase should have been done above)
-        furballs.mint(to, tkRequest.mintEdition - 1, address(this));
-      }
-
-      // Each round represents a furball
-      _resolveRounds(tkRequest.rounds, tkRequest.sender);
-
-      // Change zonens happens at the very end of the turn, so buffs can take effect
-      if (tkRequest.movements.length > 1) {
-        _changeZones(tkRequest.movements, tkRequest.sender);
-      }
-    }
-
-    return 0; // no error
+    return 0;
   }
 
   /// @notice Give rewards/outcomes directly
@@ -119,8 +136,8 @@ contract Furgreement is EIP712, FurProxy {
   /// @notice An array of "movements" can move many furballs at once.
   function _changeZones(uint256[] memory movements, address sender) internal {
     uint temp = movements[0];
-    uint8 numFurballs = uint8(temp % 0x100);
-    uint32 zone = uint32(temp / 100);
+    uint8 numFurballs = uint8(temp);
+    uint32 zone = uint32(temp >> 8);
     uint256[] memory tokenIds = new uint256[](numFurballs);
     uint fbIdx = 0;
 
@@ -128,8 +145,8 @@ contract Furgreement is EIP712, FurProxy {
       if (movements[i] < 0x1000000) {
         furballs.playMany(tokenIds, zone, sender);
         temp = movements[i];
-        numFurballs = uint8(temp % 0x100);
-        zone = uint32(temp / 100);
+        numFurballs = uint8(temp);
+        zone = uint32(temp >> 8);
         tokenIds = new uint256[](numFurballs);
         fbIdx = 0;
       } else {
@@ -141,10 +158,11 @@ contract Furgreement is EIP712, FurProxy {
     furballs.playMany(tokenIds, zone, sender);
   }
 
+  /// @notice Purchase snacks from the EIP712
   function _purchaseSnacks(uint64[] memory snacks, uint256 tokenId) internal {
     for (uint i=0; i<snacks.length; i++) {
-      uint32 snackId = uint32(snacks[i] / 0x10000);
-      uint16 count = uint16(snacks[i] % 0x10000);
+      uint32 snackId = uint32(snacks[i] >> 16);
+      uint16 count = uint16(snacks[i] & 0xFFFF);
 
       // Snacks are purchased as a "gift" because the FUR will be expended later.
       furballs.fur().purchaseSnack(address(this), FurLib.PERMISSION_CONTRACT, tokenId, snackId, count);
@@ -171,47 +189,6 @@ contract Furgreement is EIP712, FurProxy {
   function setJobAddress(address addr) external gameAdmin {
     _job = addr;
   }
-
-  // /// @notice L2 payout
-  // /// @dev Triggered by off-chain batch job
-  // function resolveFur(
-  //   uint32[] calldata furAmounts,
-  //   address[] calldata recipients
-  //   // address payout
-  // ) external allowedProxy {
-  //   // FurPayout po = FurPayout(payout);
-  //   // (address[] memory recipients, uint32[] memory furAmounts) = po.fur();
-  //   for (uint i=0; i<recipients.length; i++) {
-  //     furballs.fur().earn(recipients[i], furAmounts[i]);
-  //   }
-  // }
-
-  // /// @notice L2 payout
-  // /// @dev Triggered by off-chain batch job
-  // function resolveSnacks(
-  //   FurLib.Feeding[] calldata feedings,
-  //   address[] calldata owners
-  // ) external allowedProxy {
-  //   for (uint i=0; i<feedings.length; i++) {
-  //     furballs.fur().purchaseSnack(owners[i], FurLib.PERMISSION_USER,
-  //       feedings[i].tokenId, feedings[i].snackId, feedings[i].count);
-  //   }
-  // }
-
-  // /// @notice L2 loot drop/pickup
-  // /// @dev Triggered by off-chain batch job
-  // function resolveLoot(
-  //   L2Lib.LootResolution[] calldata loots
-  // ) external allowedProxy {
-  //   for (uint i=0; i<loots.length; i++) {
-  //     // Drop first, to make space...
-  //     if (loots[i].itemLost != 0) furballs.drop(loots[i].tokenId, loots[i].itemLost, 1);
-
-  //     // Then pickup new loot
-  //     if (loots[i].itemGained != 0) furballs.pickup(loots[i].tokenId, loots[i].itemGained);
-  //   }
-  // }
-
 
   /// @notice Simple proxy allowed check
   modifier allowedProxy() {
