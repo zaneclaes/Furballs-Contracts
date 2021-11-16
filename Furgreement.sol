@@ -4,10 +4,9 @@ pragma solidity ^0.8.6;
 import "./Furballs.sol";
 import "./Fur.sol";
 import "./utils/FurProxy.sol";
-import "./l2/FurPayout.sol";
+import "./utils/MetaData.sol";
 import "./l2/L2Lib.sol";
 import "./l2/Fuel.sol";
-import "./zones/IZone.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 
@@ -20,6 +19,9 @@ contract Furgreement is EIP712, FurProxy {
 
   // Simple, fast check for a single allowed proxy...
   address private _job;
+
+  // Simple, fast check for a single allowed proxy...
+  mapping(uint32 => uint64) private _lastAction;
 
   constructor(
     address furballsAddress, address fuelAddress
@@ -57,28 +59,33 @@ contract Furgreement is EIP712, FurProxy {
     if (errorCode != 0) return errorCode;
 
     // Burn tickets, etc.
-    uint spentFuel = fuel.burn(tkRequest.sender, tkRequest.tickets);
-    // if (spentFuel < (tkRequest.tickets / 2)) return 10;
+    if (tkRequest.tickets > 0) fuel.burn(tkRequest.sender, tkRequest.tickets);
 
+    //  Earn FUR (must be at least the amount approved by player)
     require(tkRequest.furReal >= tkRequest.furGained, "FUR");
     if (tkRequest.furReal > 0) {
       furballs.fur().earn(tkRequest.sender, tkRequest.furReal);
     }
+
+    // Spend FUR (everything approved by player)
     if (tkRequest.furSpent > 0) {
       // Spend the FUR required for these actions
       furballs.fur().spend(tkRequest.sender, tkRequest.furSpent);
+    }
 
-      if (tkRequest.mintEdition > 0) {
-        // Edition is one-indexed, to allow for null
-        address[] memory to = new address[](1);
-        to[0] = tkRequest.sender;
-
-        // "Gift" the mint (FUR purchase should have been done above)
-        furballs.mint(to, tkRequest.mintEdition - 1, address(this));
-      }
-
-      // Each round represents a furball
+    // Each round represents a furball
+    if (tkRequest.rounds.length > 0) {
       _resolveRounds(tkRequest.rounds, tkRequest.sender);
+    }
+
+    // Mint new furballs from an edition
+    if (tkRequest.mintEdition > 0) {
+      // Edition is one-indexed, to allow for null
+      address[] memory to = new address[](1);
+      to[0] = tkRequest.sender;
+
+      // "Gift" the mint (FUR purchase should have been done above)
+      furballs.mint(to, tkRequest.mintEdition - 1, address(this));
     }
 
     // Change zonens happens at the very end of the turn, so buffs can take effect
@@ -115,6 +122,11 @@ contract Furgreement is EIP712, FurProxy {
   /// @notice Give rewards/outcomes directly
   function _resolveRounds(L2Lib.RoundResolution[] memory rounds, address sender) internal {
     for (uint i=0; i<rounds.length; i++) {
+      if (rounds[i].expGained > 0) {
+        // EXP gain (in explore mode)
+        _lastAction[rounds[i].number] = uint64(block.timestamp);
+      }
+
       if (rounds[i].items.length != 0) {
         // First item is an optional drop
         if (rounds[i].items[0] != 0)
@@ -171,18 +183,34 @@ contract Furgreement is EIP712, FurProxy {
 
   /// @notice The furgreement can modify rewards
   function modifyReward(
-    FurLib.Furball memory furball,
+    FurLib.Furball calldata furball,
     FurLib.RewardModifiers memory modifiers,
-    FurLib.Account memory account,
+    FurLib.Account calldata account,
     bool contextual
   ) external view returns(FurLib.RewardModifiers memory) {
-    // If a pool zone, fur/loot are assigned previously
-    if (contextual && ZoneLib.poolZone(furball.zone) > 0) {
-      modifiers.furPercent = 0;
-      modifiers.luckPercent = 0;
-    }
+    // if (contextual) {
+    //   if (furball.zone >= 0x10000) {
+    //     // Battle zone always zero FUR now with TK
+    //     modifiers.furPercent = 0;
+    //   } else {
+
+    //   }
+    //   uint64 tkLast = _lastAction[furball.number];
+    //   if (tkLast > furball.last) {
+    //     modifiers.furPercent = 0;
+    //     modifiers.expPercent = 0;
+    //     modifiers.luckPercent = 0;
+    //   }
+    // }
 
     return modifiers;
+  }
+
+  /// @notice OpenSea metadata
+  function attributesMetadata(
+    FurLib.FurballStats calldata stats
+  ) external view returns(bytes memory) {
+    return MetaData.traitValue("Level", stats.definition.level);
   }
 
   /// @notice Proxy can be set to an arbitrary address to represent the allowed offline job

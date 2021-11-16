@@ -33,8 +33,10 @@ contract Fuel is FurProxy {
   }
 
   /// @notice Increases balance
-  function fill(address to, uint256 amount) external gameModerators {
-    tank[to] += amount;
+  function fill(address[] calldata tos, uint256[] calldata amounts) external gameModerators {
+    for (uint i=0; i<tos.length; i++) {
+      tank[tos[i]] += amounts[i];
+    }
   }
 
   /// @notice Decreases balance. Returns the amount withdrawn, where zero indicates failure.

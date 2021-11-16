@@ -189,6 +189,14 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     FurLib.Account memory account,
     bool contextual
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
+    // if (contextual && furball.zone >= 0x10000) {
+    //   // With Timekeeper, battle zones zero out the stats.
+    //   modifiers.furPercent = 0;
+    //   modifiers.expPercent = 0;
+    //   modifiers.luckPercent = 0;
+    //   return;
+    // }
+
     // Use temporary variables instead of re-assignment
     uint16 energy = modifiers.energyPoints;
     uint16 weight = furball.weight;
@@ -210,9 +218,8 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     }
 
     // Team size boosts!
-    uint256 teamSize = account.permissions < 2 ? account.numFurballs : 0;
-    if (teamSize < 10 && teamSize > 1) {
-      uint16 amt = uint16(2 * (teamSize - 1));
+    if (account.numFurballs > 1) {
+      uint16 amt = uint16(account.numFurballs < 20 ? (account.numFurballs - 1) : 20);
       expPercent += amt;
       furPercent += amt;
     }
@@ -221,12 +228,12 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     // Negative impacts come last, so subtraction does not underflow.
     // ---------------------------------------------------------------------------------------------
 
-    // Penalties for whales.
-    if (teamSize > 10) {
-      uint16 amt = uint16(5 * (teamSize > 20 ? 10 : (teamSize - 10)));
-      expPercent -= amt;
-      furPercent -= amt;
-    }
+    // // Penalties for whales.
+    // if (teamSize > 10) {
+    //   uint16 amt = uint16(5 * (teamSize > 20 ? 10 : (teamSize - 10)));
+    //   expPercent -= amt;
+    //   furPercent -= amt;
+    // }
 
     // Calculate weight & reduce luck
     if (weight > 0) {
@@ -251,7 +258,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   ) external virtual override view returns(bytes memory) {
     FurLib.FurballStats memory stats = furballs.stats(tokenId, false);
     return abi.encodePacked(
-      MetaData.traitValue("Level", stats.definition.level),
+      furballs.furgreement().attributesMetadata(stats),
       MetaData.traitValue("Rare Genes Boost", stats.definition.rarity),
       MetaData.traitNumber("Edition", (tokenId % 0x100) + 1),
       MetaData.traitNumber("Unique Loot Collected", stats.definition.inventory.length),

@@ -26,6 +26,7 @@ library L2Lib {
   /// Everything that can happen to a Furball in a single "round"
   struct RoundResolution {
     uint256 tokenId;
+    uint32 number;        // Furball number
     uint32 expGained;     //
     uint128[] items;
     uint64[] snackStacks;
