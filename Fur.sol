@@ -114,9 +114,27 @@ contract Fur is ERC20, FurProxy {
     // _gift will throw if cannot gift or cannot afford costQ
     _gift(from, permissions, furballs.ownerOf(tokenId), snack.furCost * count);
 
-    uint256 snackData = _cleanSnack(tokenId, snack.snackId);
-    uint32 existingSnackNumber = uint32(snackData / 0x100000000);
     snack.count *= count;
+    _assignSnack(snack, tokenId);
+  }
+
+  mapping(uint256 => mapping(uint32 => uint96)) public snackStates;
+
+  /// @notice Shortcut for admins/timekeeper
+  function giveSnack(
+    uint256 tokenId, uint32 snackId, uint16 count
+  ) external gameAdmin {
+    snackStates[tokenId][snackId] = uint96(block.timestamp * 0x100000000 + count);
+    // _assignSnack(snack, tokenId);
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  // Internal
+  // -----------------------------------------------------------------------------------------------
+
+  function _assignSnack(FurLib.Snack memory snack, uint256 tokenId) internal {
+    uint256 snackData = 0; //_cleanSnack(tokenId, snack.snackId);
+    uint32 existingSnackNumber = uint32(snackData / 0x100000000);
     if (existingSnackNumber > 0) {
       // Adding count effectively adds duration to the active snack
       _snacks[tokenId][existingSnackNumber - 1].count += snack.count;
@@ -126,10 +144,6 @@ contract Fur is ERC20, FurProxy {
       _snacks[tokenId].push(snack);
     }
   }
-
-  // -----------------------------------------------------------------------------------------------
-  // Internal
-  // -----------------------------------------------------------------------------------------------
 
   /// @notice Both removes inactive _snacks from a token and searches for a specific snack Id index
   /// @dev Both at once saves some size & ensures that the _snacks are frequently cleaned.

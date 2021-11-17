@@ -9,6 +9,7 @@ import "./l2/L2Lib.sol";
 import "./l2/Fuel.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
+// import "hardhat/console.sol";
 
 /// @title Furgreement
 /// @author LFG Gaming LLC
@@ -20,8 +21,18 @@ contract Furgreement is EIP712, FurProxy {
   // Simple, fast check for a single allowed proxy...
   address private _job;
 
-  // Simple, fast check for a single allowed proxy...
-  mapping(uint32 => uint64) private _lastAction;
+  // Internal tracker for a furball
+  struct LastGain {
+    uint32 total;
+    uint32 experience;
+    uint64 timestamp;
+  }
+
+  // Tightly packed EXP gain + timestamp
+  mapping(uint32 => LastGain) public lastGain;
+
+  // Silly internal count of furball token to its number overall
+  mapping(uint256 => uint32) public tokenToNumber;
 
   constructor(
     address furballsAddress, address fuelAddress
@@ -37,7 +48,11 @@ contract Furgreement is EIP712, FurProxy {
   ) external allowedProxy {
     for (uint i=0; i<tkRequests.length; i++) {
       uint errorCode = _runTimekeeper(tkRequests[i], signatures[i]);
-      require(errorCode == 0, FurLib.uint2str(errorCode));
+      require(errorCode == 0, string(abi.encodePacked(
+        FurLib.bytesHex(abi.encode(tkRequests[i].sender)),
+        ":",
+        FurLib.uint2str(errorCode)
+      )));
     }
   }
 
@@ -74,8 +89,8 @@ contract Furgreement is EIP712, FurProxy {
     }
 
     // Each round represents a furball
-    if (tkRequest.rounds.length > 0) {
-      _resolveRounds(tkRequest.rounds, tkRequest.sender);
+    for (uint i=0; i<tkRequest.rounds.length; i++) {
+      _resolveRound(tkRequest.rounds[i], tkRequest.sender);
     }
 
     // Mint new furballs from an edition
@@ -88,10 +103,10 @@ contract Furgreement is EIP712, FurProxy {
       furballs.mint(to, tkRequest.mintEdition - 1, address(this));
     }
 
-    // Change zonens happens at the very end of the turn, so buffs can take effect
-    if (tkRequest.movements.length > 1) {
-      _changeZones(tkRequest.movements, tkRequest.sender);
-    }
+    // // Change zonens happens at the very end of the turn, so buffs can take effect
+    // if (tkRequest.movements.length > 1) {
+    //   _changeZones(tkRequest.movements, tkRequest.sender);
+    // }
 
     return errorCode; // no error
   }
@@ -120,65 +135,63 @@ contract Furgreement is EIP712, FurProxy {
   }
 
   /// @notice Give rewards/outcomes directly
-  function _resolveRounds(L2Lib.RoundResolution[] memory rounds, address sender) internal {
-    for (uint i=0; i<rounds.length; i++) {
-      if (rounds[i].expGained > 0) {
-        // EXP gain (in explore mode)
-        _lastAction[rounds[i].number] = uint64(block.timestamp);
-      }
-
-      if (rounds[i].items.length != 0) {
-        // First item is an optional drop
-        if (rounds[i].items[0] != 0)
-          furballs.drop(rounds[i].tokenId, rounds[i].items[0], 1);
-
-        // Other items are pickups
-        for (uint j=1; j<rounds[i].items.length; j++) {
-          furballs.pickup(rounds[i].tokenId, rounds[i].items[j]);
-        }
-      }
-
-      // And purchase snacks
-      if (rounds[i].snackStacks.length != 0) {
-        _purchaseSnacks(rounds[i].snackStacks, rounds[i].tokenId);
-      }
+  function _resolveRound(L2Lib.RoundResolution memory round, address sender) internal {
+    if (round.expGained > 0) {
+      // EXP gain (in explore mode)
+      lastGain[round.number].timestamp = uint64(block.timestamp);
+      lastGain[round.number].experience = round.expGained;
+    // if (tokenToNumber[round.tokenId] == 0) {
+    //   tokenToNumber[round.tokenId] = round.number;
+    // }
     }
-  }
 
-  /// @notice An array of "movements" can move many furballs at once.
-  function _changeZones(uint256[] memory movements, address sender) internal {
-    uint temp = movements[0];
-    uint8 numFurballs = uint8(temp);
-    uint32 zone = uint32(temp >> 8);
-    uint256[] memory tokenIds = new uint256[](numFurballs);
-    uint fbIdx = 0;
+    if (round.items.length != 0) {
+      // First item is an optional drop
+      if (round.items[0] != 0)
+        furballs.drop(round.tokenId, round.items[0], 1);
 
-    for (uint i=1; i<movements.length; i++) {
-      if (movements[i] < 0x1000000) {
-        furballs.playMany(tokenIds, zone, sender);
-        temp = movements[i];
-        numFurballs = uint8(temp);
-        zone = uint32(temp >> 8);
-        tokenIds = new uint256[](numFurballs);
-        fbIdx = 0;
-      } else {
-        tokenIds[fbIdx] = movements[i];
-        fbIdx = fbIdx + 1;
+      // Other items are pickups
+      for (uint j=1; j<round.items.length; j++) {
+        furballs.pickup(round.tokenId, round.items[j]);
       }
     }
 
-    furballs.playMany(tokenIds, zone, sender);
+    // And purchase snacks
+    for (uint i=0; i<round.snackStacks.length; i++) {
+      _giveSnack(round.tokenId, round.snackStacks[i]);
+    }
   }
+
+  // /// @notice An array of "movements" can move many furballs at once.
+  // function _changeZones(uint256[] memory movements, address sender) internal {
+  //   uint temp = movements[0];
+  //   uint8 numFurballs = uint8(temp);
+  //   uint32 zone = uint32(temp >> 8);
+  //   uint256[] memory tokenIds = new uint256[](numFurballs);
+  //   uint fbIdx = 0;
+
+  //   for (uint i=1; i<movements.length; i++) {
+  //     if (movements[i] < 0x1000000) {
+  //       furballs.playMany(tokenIds, zone, sender);
+  //       temp = movements[i];
+  //       numFurballs = uint8(temp);
+  //       zone = uint32(temp >> 8);
+  //       tokenIds = new uint256[](numFurballs);
+  //       fbIdx = 0;
+  //     } else {
+  //       tokenIds[fbIdx] = movements[i];
+  //       fbIdx = fbIdx + 1;
+  //     }
+  //   }
+
+  //   furballs.playMany(tokenIds, zone, sender);
+  // }
 
   /// @notice Purchase snacks from the EIP712
-  function _purchaseSnacks(uint64[] memory snacks, uint256 tokenId) internal {
-    for (uint i=0; i<snacks.length; i++) {
-      uint32 snackId = uint32(snacks[i] >> 16);
-      uint16 count = uint16(snacks[i] & 0xFFFF);
+  function _giveSnack(uint256 tokenId, uint64 stack) internal {
+    furballs.fur().giveSnack(tokenId, uint32(stack >> 16), uint16(stack));
 
-      // Snacks are purchased as a "gift" because the FUR will be expended later.
-      furballs.fur().purchaseSnack(address(this), FurLib.PERMISSION_CONTRACT, tokenId, snackId, count);
-    }
+    // Snacks are purchased as a "gift" because the FUR will be expended later.
   }
 
   /// @notice The furgreement can modify rewards
@@ -188,29 +201,42 @@ contract Furgreement is EIP712, FurProxy {
     FurLib.Account calldata account,
     bool contextual
   ) external view returns(FurLib.RewardModifiers memory) {
-    // if (contextual) {
-    //   if (furball.zone >= 0x10000) {
-    //     // Battle zone always zero FUR now with TK
-    //     modifiers.furPercent = 0;
-    //   } else {
-
-    //   }
-    //   uint64 tkLast = _lastAction[furball.number];
-    //   if (tkLast > furball.last) {
-    //     modifiers.furPercent = 0;
-    //     modifiers.expPercent = 0;
-    //     modifiers.luckPercent = 0;
-    //   }
-    // }
+    if (contextual) {
+      if (furball.zone >= 0x10000) {
+        // Battle zone always zero FUR now with TK
+        modifiers.furPercent = 0;
+      } else {
+        // In explore (exp), we need to adjust for prior EXP collections
+        LastGain memory last = lastGain[furball.number];
+        if (last.timestamp > furball.last) {
+          uint remains = block.timestamp - last.timestamp;
+          uint total = block.timestamp - furball.last;
+          modifiers.expPercent = uint16(modifiers.expPercent * remains / total);
+          modifiers.luckPercent = uint16(modifiers.luckPercent * remains / total);
+        }
+      }
+    }
 
     return modifiers;
   }
 
+  /// @notice Hook for zone change
+  /// @dev When a furball changes zone, we need to clear the lastGain timestamp
+  function enterZone(uint256 tokenId, uint32 zone) external {
+    uint32 furballNumber = tokenToNumber[tokenId];
+    if (furballNumber > 0) {
+      lastGain[furballNumber].timestamp = 0;
+      lastGain[furballNumber].experience = 0;
+    }
+  }
+
   /// @notice OpenSea metadata
   function attributesMetadata(
-    FurLib.FurballStats calldata stats
+    FurLib.FurballStats calldata stats, uint32 maxExperience
   ) external view returns(bytes memory) {
-    return MetaData.traitValue("Level", stats.definition.level);
+    return MetaData.traitValue("Level", FurLib.expToLevel(
+      stats.definition.experience + lastGain[stats.definition.number].experience, maxExperience
+    ));
   }
 
   /// @notice Proxy can be set to an arbitrary address to represent the allowed offline job

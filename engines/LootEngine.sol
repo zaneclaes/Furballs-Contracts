@@ -65,7 +65,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   function enterZone(
     uint256 tokenId, uint32 zone, uint256[] memory team
   ) external virtual override returns(uint256) {
-    // Nothing to see here.
+    furballs.furgreement().enterZone(tokenId, zone);
     return uint256(zone);
   }
 
@@ -219,7 +219,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
 
     // Team size boosts!
     if (account.numFurballs > 1) {
-      uint16 amt = uint16(account.numFurballs < 20 ? (account.numFurballs - 1) : 20);
+      uint16 amt = uint16(2 * (account.numFurballs < 10 ? (account.numFurballs - 1) : 10));
       expPercent += amt;
       furPercent += amt;
     }
@@ -258,7 +258,8 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   ) external virtual override view returns(bytes memory) {
     FurLib.FurballStats memory stats = furballs.stats(tokenId, false);
     return abi.encodePacked(
-      furballs.furgreement().attributesMetadata(stats),
+      furballs.furgreement().attributesMetadata(stats, maxExperience),
+      MetaData.trait("Zone", stats.definition.zone < 0x10000 ? "Explore" : "Battle"),
       MetaData.traitValue("Rare Genes Boost", stats.definition.rarity),
       MetaData.traitNumber("Edition", (tokenId % 0x100) + 1),
       MetaData.traitNumber("Unique Loot Collected", stats.definition.inventory.length),

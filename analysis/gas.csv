@@ -1,11 +1,13 @@
 ,Cost Type,5p 1fb ea,5p 5fb ea,20p 1fb ea,20p 5fb ea
-battle,Furball,,,157794,72224
-explore,Furball,,,172982,111216
+battle,Furball,,,144447,70242
+explore,Furball,,,178889,119384
 tkBattle,Furball,154434,85007,145308,82733
+tkExp,Furball,80438,36513,74867,35423
 tkExplore,Furball,157219,87803,148095,85701
 tkFur,Player,42753,42753,35147,35147
-tkMint,Furball,348934,,331589,
-tkSnack1,Furball,106051,70990,97780,69366
-tkSnack2,Furball,144117,108415,135253,106681
+tkMint,Furball,376552,71811,340950,68060
+tkSnack1,Furball,87511,42231,80674,40895
+tkSnack2,Furball,115439,70160,108612,68835
+tkSpend,Player,70655,70655,63069,63069
 tkTickets,Player,27903,27903,22294,22294
 tkUpgrade,Furball,94460,69743,86689,68219
