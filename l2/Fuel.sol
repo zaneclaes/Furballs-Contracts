@@ -33,7 +33,7 @@ contract Fuel is FurProxy {
   }
 
   /// @notice Increases balance
-  function fill(address[] calldata tos, uint256[] calldata amounts) external gameModerators {
+  function gift(address[] calldata tos, uint256[] calldata amounts) external gameModerators {
     for (uint i=0; i<tos.length; i++) {
       tank[tos[i]] += amounts[i];
     }

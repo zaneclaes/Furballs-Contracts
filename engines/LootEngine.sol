@@ -2,6 +2,7 @@
 pragma solidity ^0.8.6;
 
 import "./ILootEngine.sol";
+import "./SnackShop.sol";
 import "../editions/IFurballEdition.sol";
 import "../Furballs.sol";
 import "../utils/FurLib.sol";
@@ -22,27 +23,17 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   // An address which may act on behalf of the owner (company)
   address public companyWalletProxy;
 
-  // snackId to "definition" of the snack
-  mapping(uint32 => FurLib.Snack) private _snacks;
+  // Simple storage of snack definitions
+  SnackShop public snackShop;
 
   uint32 maxExperience = 2010000;
 
   constructor(
-    address furballsAddress, address tradeProxy, address companyProxy
+    address furballsAddress, address tradeProxy, address companyProxy, address snacksAddr
   ) FurProxy(furballsAddress) {
     _proxies = ProxyRegistry(tradeProxy);
     companyWalletProxy = companyProxy;
-
-    _defineSnack(0x100, 24    ,  250, 15, 0);
-    _defineSnack(0x200, 24 * 3,  750, 20, 0);
-    _defineSnack(0x300, 24 * 7, 1500, 25, 0);
-  }
-
-  /// @notice Allows admins to configure the snack store.
-  function setSnack(
-    uint32 snackId, uint32 duration, uint16 furCost, uint16 hap, uint16 en
-  ) external gameAdmin {
-    _defineSnack(snackId, duration, furCost, hap, en);
+    snackShop = SnackShop(snacksAddr);
   }
 
   /// @notice Loot can have different weight to help prevent over-powering a furball
@@ -179,7 +170,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
 
   /// @notice The snack shop has IDs for each snack definition
   function getSnack(uint32 snackId) external view virtual override returns(FurLib.Snack memory) {
-    return _snacks[snackId];
+    return snackShop.getSnack(snackId);
   }
 
   /// @notice Layers on LootEngine modifiers to rewards
@@ -189,26 +180,20 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     FurLib.Account memory account,
     bool contextual
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
-    // if (contextual && furball.zone >= 0x10000) {
-    //   // With Timekeeper, battle zones zero out the stats.
-    //   modifiers.furPercent = 0;
-    //   modifiers.expPercent = 0;
-    //   modifiers.luckPercent = 0;
-    //   return;
-    // }
-
-    // Use temporary variables instead of re-assignment
+    // Use temporary variables is more gas-efficient than accessing them off the struct
     uint16 energy = modifiers.energyPoints;
     uint16 weight = furball.weight;
     uint16 expPercent = modifiers.expPercent + modifiers.happinessPoints;
-    uint16 luckPercent = modifiers.luckPercent + modifiers.happinessPoints;
-    uint16 furPercent = modifiers.furPercent + _furBoost(furball.level) + energy;
+    uint16 luckPercent = contextual ? 0 : modifiers.luckPercent + modifiers.happinessPoints;
+    uint16 furPercent = contextual ? 0 : modifiers.furPercent + _furBoost(furball.level) + energy;
 
     // First add in the inventory
     for (uint256 i=0; i<furball.inventory.length; i++) {
       uint128 lootId = uint128(furball.inventory[i] / 0x100);
-      uint32 stackSize = uint32(furball.inventory[i] % 0x100);
       (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
+      if (stat == 1 && contextual) continue;
+
+      uint32 stackSize = uint32(furball.inventory[i] & 0xFF);
       uint16 boost = uint16(_lootRarityBoost(rarity) * stackSize);
       if (stat == 0) {
         expPercent += boost;
@@ -219,24 +204,17 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
 
     // Team size boosts!
     if (account.numFurballs > 1) {
-      uint16 amt = uint16(2 * (account.numFurballs < 10 ? (account.numFurballs - 1) : 10));
+      uint16 amt = uint16(2 * (account.numFurballs <= 10 ? (account.numFurballs - 1) : 10));
       expPercent += amt;
-      furPercent += amt;
+      if (!contextual) furPercent += amt;
     }
 
     // ---------------------------------------------------------------------------------------------
     // Negative impacts come last, so subtraction does not underflow.
     // ---------------------------------------------------------------------------------------------
 
-    // // Penalties for whales.
-    // if (teamSize > 10) {
-    //   uint16 amt = uint16(5 * (teamSize > 20 ? 10 : (teamSize - 10)));
-    //   expPercent -= amt;
-    //   furPercent -= amt;
-    // }
-
     // Calculate weight & reduce luck
-    if (weight > 0) {
+    if (!contextual && weight > 0) {
       if (energy > 0) {
         weight = (energy >= weight) ? 0 : (weight - energy);
       }
@@ -245,11 +223,11 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
       }
     }
 
-    modifiers.furPercent = furPercent;
-    modifiers.luckPercent = luckPercent;
+    modifiers.furPercent = contextual ? 0 : furPercent;
+    modifiers.luckPercent = contextual ? 0 : luckPercent;
     modifiers.expPercent = expPercent;
 
-    return furballs.furgreement().modifyReward(furball, modifiers, account, contextual);
+    return modifiers;
   }
 
   /// @notice OpenSea metadata
@@ -261,26 +239,13 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
       furballs.furgreement().attributesMetadata(stats, maxExperience),
       MetaData.trait("Zone", stats.definition.zone < 0x10000 ? "Explore" : "Battle"),
       MetaData.traitValue("Rare Genes Boost", stats.definition.rarity),
-      MetaData.traitNumber("Edition", (tokenId % 0x100) + 1),
+      MetaData.traitNumber("Edition", (tokenId & 0xFF) + 1),
       MetaData.traitNumber("Unique Loot Collected", stats.definition.inventory.length),
       MetaData.traitBoost("EXP Boost", stats.modifiers.expPercent),
       MetaData.traitBoost("FUR Boost", stats.modifiers.furPercent),
       MetaData.traitDate("Acquired", stats.definition.trade),
       MetaData.traitDate("Birthday", stats.definition.birth)
     );
-  }
-
-  /// @notice Store a new snack definition
-  function _defineSnack(
-    uint32 snackId, uint32 duration, uint16 furCost, uint16 hap, uint16 en
-  ) internal {
-    _snacks[snackId].snackId = snackId;
-    _snacks[snackId].duration = duration;
-    _snacks[snackId].furCost = furCost;
-    _snacks[snackId].happiness = hap;
-    _snacks[snackId].energy = en;
-    _snacks[snackId].count = 1;
-    _snacks[snackId].fed = 0;
   }
 
   function _lootRarityBoost(uint16 rarity) internal pure returns (uint16) {

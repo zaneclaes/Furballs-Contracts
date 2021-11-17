@@ -41,8 +41,9 @@ library L2Lib {
     uint32 furSpent;      // How much FUR the player spent
     uint32 furReal;       // The ACTUAL FUR the player earned (must be >= furGained)
     uint8 mintEdition;    // Mint a furball from this edition
+    uint8 mintCount;      // Mint this many Furballs
     uint64 deadline;      // When it is good until
-    // uint256[] movements;  // Which furballs moved where
+    uint256[] movements;  // Which furballs moved where
   }
 
   // Track the results of a TimekeeperAuthorization

@@ -48,7 +48,7 @@ contract Furgreement is EIP712, FurProxy {
   ) external allowedProxy {
     for (uint i=0; i<tkRequests.length; i++) {
       uint errorCode = _runTimekeeper(tkRequests[i], signatures[i]);
-      require(errorCode == 0, string(abi.encodePacked(
+      require(errorCode == 0, errorCode == 0 ? "" : string(abi.encodePacked(
         FurLib.bytesHex(abi.encode(tkRequests[i].sender)),
         ":",
         FurLib.uint2str(errorCode)
@@ -94,21 +94,23 @@ contract Furgreement is EIP712, FurProxy {
     }
 
     // Mint new furballs from an edition
-    if (tkRequest.mintEdition > 0) {
+    if (tkRequest.mintCount > 0) {
       // Edition is one-indexed, to allow for null
-      address[] memory to = new address[](1);
-      to[0] = tkRequest.sender;
+      address[] memory to = new address[](tkRequest.mintCount);
+      for (uint i=0; i<tkRequest.mintCount; i++) {
+        to[i] = tkRequest.sender;
+      }
 
       // "Gift" the mint (FUR purchase should have been done above)
-      furballs.mint(to, tkRequest.mintEdition - 1, address(this));
+      furballs.mint(to, tkRequest.mintEdition, address(this));
     }
 
-    // // Change zonens happens at the very end of the turn, so buffs can take effect
-    // if (tkRequest.movements.length > 1) {
-    //   _changeZones(tkRequest.movements, tkRequest.sender);
-    // }
+    // Change zonens happens at the very end of the turn, so buffs can take effect
+    if (tkRequest.movements.length > 1) {
+      _changeZones(tkRequest.movements, tkRequest.sender);
+    }
 
-    return errorCode; // no error
+    return 0; // no error
   }
 
   /// @notice Validate a timekeeper request
@@ -117,12 +119,13 @@ contract Furgreement is EIP712, FurProxy {
     bytes memory signature
   ) internal view returns (uint) {
     bytes32 digest = _hashTypedDataV4(keccak256(abi.encode(
-      keccak256("TimekeeperRequest(address sender,uint32 fuel,uint32 fur_gained,uint32 fur_spent,uint8 mint_edition,uint64 deadline)"),
+      keccak256("TimekeeperRequest(address sender,uint32 fuel,uint32 fur_gained,uint32 fur_spent,uint8 mint_edition,uint8 mint_count,uint64 deadline)"),
       tkRequest.sender,
       tkRequest.tickets,
       tkRequest.furGained,
       tkRequest.furSpent,
       tkRequest.mintEdition,
+      tkRequest.mintCount,
       tkRequest.deadline
     )));
 
@@ -140,9 +143,9 @@ contract Furgreement is EIP712, FurProxy {
       // EXP gain (in explore mode)
       lastGain[round.number].timestamp = uint64(block.timestamp);
       lastGain[round.number].experience = round.expGained;
-    // if (tokenToNumber[round.tokenId] == 0) {
-    //   tokenToNumber[round.tokenId] = round.number;
-    // }
+      // if (tokenToNumber[round.tokenId] == 0) {
+      //   tokenToNumber[round.tokenId] = round.number;
+      // }
     }
 
     if (round.items.length != 0) {
@@ -162,30 +165,30 @@ contract Furgreement is EIP712, FurProxy {
     }
   }
 
-  // /// @notice An array of "movements" can move many furballs at once.
-  // function _changeZones(uint256[] memory movements, address sender) internal {
-  //   uint temp = movements[0];
-  //   uint8 numFurballs = uint8(temp);
-  //   uint32 zone = uint32(temp >> 8);
-  //   uint256[] memory tokenIds = new uint256[](numFurballs);
-  //   uint fbIdx = 0;
+  /// @notice An array of "movements" can move many furballs at once.
+  function _changeZones(uint256[] memory movements, address sender) internal {
+    uint temp = movements[0];
+    uint8 numFurballs = uint8(temp);
+    uint32 zone = uint32(temp >> 8);
+    uint256[] memory tokenIds = new uint256[](numFurballs);
+    uint fbIdx = 0;
 
-  //   for (uint i=1; i<movements.length; i++) {
-  //     if (movements[i] < 0x1000000) {
-  //       furballs.playMany(tokenIds, zone, sender);
-  //       temp = movements[i];
-  //       numFurballs = uint8(temp);
-  //       zone = uint32(temp >> 8);
-  //       tokenIds = new uint256[](numFurballs);
-  //       fbIdx = 0;
-  //     } else {
-  //       tokenIds[fbIdx] = movements[i];
-  //       fbIdx = fbIdx + 1;
-  //     }
-  //   }
+    for (uint i=1; i<movements.length; i++) {
+      if (movements[i] < 0x1000000) {
+        furballs.playMany(tokenIds, zone, sender);
+        temp = movements[i];
+        numFurballs = uint8(temp);
+        zone = uint32(temp >> 8);
+        tokenIds = new uint256[](numFurballs);
+        fbIdx = 0;
+      } else {
+        tokenIds[fbIdx] = movements[i];
+        fbIdx = fbIdx + 1;
+      }
+    }
 
-  //   furballs.playMany(tokenIds, zone, sender);
-  // }
+    furballs.playMany(tokenIds, zone, sender);
+  }
 
   /// @notice Purchase snacks from the EIP712
   function _giveSnack(uint256 tokenId, uint64 stack) internal {
@@ -195,48 +198,55 @@ contract Furgreement is EIP712, FurProxy {
   }
 
   /// @notice The furgreement can modify rewards
-  function modifyReward(
-    FurLib.Furball calldata furball,
-    FurLib.RewardModifiers memory modifiers,
-    FurLib.Account calldata account,
-    bool contextual
-  ) external view returns(FurLib.RewardModifiers memory) {
-    if (contextual) {
-      if (furball.zone >= 0x10000) {
-        // Battle zone always zero FUR now with TK
-        modifiers.furPercent = 0;
-      } else {
-        // In explore (exp), we need to adjust for prior EXP collections
-        LastGain memory last = lastGain[furball.number];
-        if (last.timestamp > furball.last) {
-          uint remains = block.timestamp - last.timestamp;
-          uint total = block.timestamp - furball.last;
-          modifiers.expPercent = uint16(modifiers.expPercent * remains / total);
-          modifiers.luckPercent = uint16(modifiers.luckPercent * remains / total);
-        }
-      }
-    }
+  // function modifyReward(
+  //   FurLib.Furball calldata furball,
+  //   FurLib.RewardModifiers memory modifiers,
+  //   FurLib.Account calldata account,
+  //   bool contextual
+  // ) external view returns(FurLib.RewardModifiers memory) {
+  //   if (contextual) {
+  //     if (furball.zone >= 0x10000) {
+  //       // Battle zone always zero FUR now with TK
+  //       modifiers.furPercent = 0;
+  //     } else {
+  //       // Explore zone only zeros out collection stats if timekeeper has been used
+  //       LastGain memory last = lastGain[furball.number];
+  //       if (last.timestamp > furball.last) {
+  //       }
+  //     }
+  //   }
 
-    return modifiers;
-  }
+  //   return modifiers;
+  // }
 
   /// @notice Hook for zone change
   /// @dev When a furball changes zone, we need to clear the lastGain timestamp
   function enterZone(uint256 tokenId, uint32 zone) external {
-    uint32 furballNumber = tokenToNumber[tokenId];
-    if (furballNumber > 0) {
-      lastGain[furballNumber].timestamp = 0;
-      lastGain[furballNumber].experience = 0;
-    }
+    // uint32 furballNumber = tokenToNumber[tokenId];
+    // if (furballNumber > 0) {
+    //   lastGain[furballNumber].timestamp = 0;
+    //   lastGain[furballNumber].experience = 0;
+    // }
   }
 
   /// @notice OpenSea metadata
   function attributesMetadata(
     FurLib.FurballStats calldata stats, uint32 maxExperience
   ) external view returns(bytes memory) {
-    return MetaData.traitValue("Level", FurLib.expToLevel(
-      stats.definition.experience + lastGain[stats.definition.number].experience, maxExperience
-    ));
+    FurLib.Furball memory furball = stats.definition;
+    uint level = furball.level;
+
+    // if (furball.zone < 0x10000) {
+    //   // When in explore, we check if TK has accrued more experience for this furball
+    //   LastGain memory last = lastGain[furball.number];
+    //   if (last.timestamp > furball.last) {
+    //     level = FurLib.expToLevel(
+    //       furball.experience + lastGain[stats.definition.number].experience, maxExperience
+    //     );
+    //   }
+    // }
+
+    return MetaData.traitValue("Level", level);
   }
 
   /// @notice Proxy can be set to an arbitrary address to represent the allowed offline job

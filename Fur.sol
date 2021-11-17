@@ -17,6 +17,12 @@ contract Fur is ERC20, FurProxy {
   // tokenId => mapping of fed _snacks
   mapping(uint256 => FurLib.Snack[]) public _snacks;
 
+  // tokenId => snackId => (snackId) + (stackSize)
+  mapping(uint256 => mapping(uint32 => uint96)) public snackStates;
+
+  // tokenId => snackId => (snackId) + (stackSize)
+  mapping(uint256 => mapping(uint32 => uint96)) public snackCounts;
+
   // Internal cache for speed.
   uint256 private _intervalDuration;
 
@@ -60,14 +66,21 @@ contract Fur is ERC20, FurProxy {
   // -----------------------------------------------------------------------------------------------
 
   /// @notice FUR can only be minted by furballs doing battle.
-  function earn(address addr, uint256 amount) external gameAdmin {
+  function earn(address addr, uint256 amount) external gameModerators {
     if (amount == 0) return;
     _mint(addr, amount);
   }
 
   /// @notice FUR can be spent by Furballs, or by the LootEngine (shopping, in the future)
-  function spend(address addr, uint256 amount) external gameAdmin {
+  function spend(address addr, uint256 amount) external gameModerators {
     _burn(addr, amount);
+  }
+
+  /// @notice Increases balance in bulk
+  function gift(address[] calldata tos, uint256[] calldata amounts) external gameModerators {
+    for (uint i=0; i<tos.length; i++) {
+      _mint(tos[i], amounts[i]);
+    }
   }
 
   /// @notice Pay any necessary fees to mint a furball
@@ -117,8 +130,6 @@ contract Fur is ERC20, FurProxy {
     snack.count *= count;
     _assignSnack(snack, tokenId);
   }
-
-  mapping(uint256 => mapping(uint32 => uint96)) public snackStates;
 
   /// @notice Shortcut for admins/timekeeper
   function giveSnack(
