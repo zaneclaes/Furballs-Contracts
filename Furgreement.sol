@@ -34,6 +34,9 @@ contract Furgreement is EIP712, FurProxy {
   // Silly internal count of furball token to its number overall
   mapping(uint256 => uint32) public tokenToNumber;
 
+  // All zone changes from a round, executed at once
+  mapping(uint32 => uint256[]) private _pendingZones;
+
   constructor(
     address furballsAddress, address fuelAddress
   ) EIP712("Furgreement", "1") FurProxy(furballsAddress) {
@@ -143,9 +146,9 @@ contract Furgreement is EIP712, FurProxy {
       // EXP gain (in explore mode)
       lastGain[round.number].timestamp = uint64(block.timestamp);
       lastGain[round.number].experience = round.expGained;
-      // if (tokenToNumber[round.tokenId] == 0) {
-      //   tokenToNumber[round.tokenId] = round.number;
-      // }
+      if (tokenToNumber[round.tokenId] == 0) {
+        tokenToNumber[round.tokenId] = round.number;
+      }
     }
 
     if (round.items.length != 0) {
@@ -159,9 +162,10 @@ contract Furgreement is EIP712, FurProxy {
       }
     }
 
-    // And purchase snacks
+    // And give away snacks (FUR spending done separately)
     for (uint i=0; i<round.snackStacks.length; i++) {
-      _giveSnack(round.tokenId, round.snackStacks[i]);
+      uint64 stack = round.snackStacks[i];
+      furballs.fur().giveSnack(round.tokenId, uint32(stack >> 16), uint16(stack));
     }
   }
 
@@ -175,7 +179,7 @@ contract Furgreement is EIP712, FurProxy {
 
     for (uint i=1; i<movements.length; i++) {
       if (movements[i] < 0x1000000) {
-        furballs.playMany(tokenIds, zone, sender);
+        // furballs.playMany(tokenIds, zone, address(this));
         temp = movements[i];
         numFurballs = uint8(temp);
         zone = uint32(temp >> 8);
@@ -187,46 +191,17 @@ contract Furgreement is EIP712, FurProxy {
       }
     }
 
-    furballs.playMany(tokenIds, zone, sender);
+    furballs.playMany(tokenIds, zone, address(this));
   }
-
-  /// @notice Purchase snacks from the EIP712
-  function _giveSnack(uint256 tokenId, uint64 stack) internal {
-    furballs.fur().giveSnack(tokenId, uint32(stack >> 16), uint16(stack));
-
-    // Snacks are purchased as a "gift" because the FUR will be expended later.
-  }
-
-  /// @notice The furgreement can modify rewards
-  // function modifyReward(
-  //   FurLib.Furball calldata furball,
-  //   FurLib.RewardModifiers memory modifiers,
-  //   FurLib.Account calldata account,
-  //   bool contextual
-  // ) external view returns(FurLib.RewardModifiers memory) {
-  //   if (contextual) {
-  //     if (furball.zone >= 0x10000) {
-  //       // Battle zone always zero FUR now with TK
-  //       modifiers.furPercent = 0;
-  //     } else {
-  //       // Explore zone only zeros out collection stats if timekeeper has been used
-  //       LastGain memory last = lastGain[furball.number];
-  //       if (last.timestamp > furball.last) {
-  //       }
-  //     }
-  //   }
-
-  //   return modifiers;
-  // }
 
   /// @notice Hook for zone change
   /// @dev When a furball changes zone, we need to clear the lastGain timestamp
   function enterZone(uint256 tokenId, uint32 zone) external {
-    // uint32 furballNumber = tokenToNumber[tokenId];
-    // if (furballNumber > 0) {
-    //   lastGain[furballNumber].timestamp = 0;
-    //   lastGain[furballNumber].experience = 0;
-    // }
+    uint32 furballNumber = tokenToNumber[tokenId];
+    if (furballNumber > 0) {
+      lastGain[furballNumber].timestamp = 0;
+      lastGain[furballNumber].experience = 0;
+    }
   }
 
   /// @notice OpenSea metadata
@@ -236,15 +211,15 @@ contract Furgreement is EIP712, FurProxy {
     FurLib.Furball memory furball = stats.definition;
     uint level = furball.level;
 
-    // if (furball.zone < 0x10000) {
-    //   // When in explore, we check if TK has accrued more experience for this furball
-    //   LastGain memory last = lastGain[furball.number];
-    //   if (last.timestamp > furball.last) {
-    //     level = FurLib.expToLevel(
-    //       furball.experience + lastGain[stats.definition.number].experience, maxExperience
-    //     );
-    //   }
-    // }
+    if (furball.zone < 0x10000) {
+      // When in explore, we check if TK has accrued more experience for this furball
+      LastGain memory last = lastGain[furball.number];
+      if (last.timestamp > furball.last) {
+        level = FurLib.expToLevel(
+          furball.experience + lastGain[stats.definition.number].experience, maxExperience
+        );
+      }
+    }
 
     return MetaData.traitValue("Level", level);
   }

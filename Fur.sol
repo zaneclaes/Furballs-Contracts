@@ -34,6 +34,11 @@ contract Fur is ERC20, FurProxy {
   // Public
   // -----------------------------------------------------------------------------------------------
 
+  /// @notice FUR is a strict counter, with no decimals
+  function decimals() public view virtual override returns (uint8) {
+    return 0;
+  }
+
   /// @notice Returns the snacks currently applied to a Furball
   function snacks(uint256 tokenId) external view returns(FurLib.Snack[] memory) {
     return _snacks[tokenId];

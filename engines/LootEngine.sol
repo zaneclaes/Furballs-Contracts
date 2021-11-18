@@ -44,7 +44,10 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
 
   /// @notice Gets called for Metadata
   function furballDescription(uint256 tokenId) external virtual override view returns (string memory) {
-    return "";
+    return string(abi.encodePacked(
+      '", "animation_url": "https://', _getSubdomain(),
+      'furballs.com/embed/', FurLib.bytesHex(abi.encode(tokenId))
+    ));
   }
 
   /// @notice Gets called at the beginning of token render; could add underlaid artwork
@@ -273,6 +276,22 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     return (
       uint8(FurLib.extractBytes(lootId, FurLib.LOOT_BYTE_RARITY, 1)),
       uint8(FurLib.extractBytes(lootId, FurLib.LOOT_BYTE_STAT, 1)));
+  }
+
+  function _getSubdomain() internal view returns (string memory) {
+    uint chainId = _getChainId();
+    if (chainId == 3) return "ropsten.";
+    if (chainId == 4) return "rinkeby.";
+    if (chainId == 31337) return "localhost.";
+    return "";
+  }
+
+  function _getChainId() internal view returns (uint256) {
+    uint256 chainId;
+    assembly {
+      chainId := chainid()
+    }
+    return chainId;
   }
 
   function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
