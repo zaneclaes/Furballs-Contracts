@@ -26,8 +26,8 @@ library L2Lib {
   /// Everything that can happen to a Furball in a single "round"
   struct RoundResolution {
     uint256 tokenId;
-    uint32 number;        // Furball number
     uint32 expGained;     //
+    uint8 zoneListNum;
     uint128[] items;
     uint64[] snackStacks;
   }
@@ -43,7 +43,7 @@ library L2Lib {
     uint8 mintEdition;    // Mint a furball from this edition
     uint8 mintCount;      // Mint this many Furballs
     uint64 deadline;      // When it is good until
-    uint256[] movements;  // Which furballs moved where
+    // uint256[] movements;  // Moves made by furballs
   }
 
   // Track the results of a TimekeeperAuthorization

@@ -11,7 +11,8 @@ import "../utils/ProxyRegistry.sol";
 import "../utils/Dice.sol";
 import "../utils/Governance.sol";
 import "../utils/MetaData.sol";
-import "../zones/ZoneLib.sol";
+import "./ZoneLib.sol";
+import "./Zones.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
 /// @title LootEngine
@@ -23,17 +24,23 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   // An address which may act on behalf of the owner (company)
   address public companyWalletProxy;
 
+  // Zone control contract
+  Zones override public zones;
+
   // Simple storage of snack definitions
   SnackShop public snackShop;
 
   uint32 maxExperience = 2010000;
 
   constructor(
-    address furballsAddress, address tradeProxy, address companyProxy, address snacksAddr
+    address furballsAddress,
+    address snacksAddr, address zonesAddr,
+    address tradeProxy, address companyProxy
   ) FurProxy(furballsAddress) {
     _proxies = ProxyRegistry(tradeProxy);
     companyWalletProxy = companyProxy;
     snackShop = SnackShop(snacksAddr);
+    zones = Zones(zonesAddr);
   }
 
   /// @notice Loot can have different weight to help prevent over-powering a furball
@@ -45,22 +52,23 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   /// @notice Gets called for Metadata
   function furballDescription(uint256 tokenId) external virtual override view returns (string memory) {
     return string(abi.encodePacked(
+      '", "external_url": "https://', _getSubdomain(),
+      'furballs.com/fb/', FurLib.bytesHex(abi.encode(tokenId)),
       '", "animation_url": "https://', _getSubdomain(),
-      'furballs.com/embed/', FurLib.bytesHex(abi.encode(tokenId))
+      'furballs.com/e/', FurLib.bytesHex(abi.encode(tokenId))
     ));
   }
 
-  /// @notice Gets called at the beginning of token render; could add underlaid artwork
+  /// @notice Gets called at the beginning of token render; zones are able to render BKs
   function render(uint256 tokenId) external virtual override view returns(string memory) {
-    return "";
+    return zones.getBackgroundSvg(tokenId);
   }
 
   /// @notice Checking the zone may use _require to detect preconditions.
   function enterZone(
     uint256 tokenId, uint32 zone, uint256[] memory team
   ) external virtual override returns(uint256) {
-    furballs.furgreement().enterZone(tokenId, zone);
-    return uint256(zone);
+    return zones.enterZone(tokenId, zone);
   }
 
   /// @notice Proxy logic is presently delegated to OpenSea-like contract
@@ -109,6 +117,15 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   function onTrade(
     FurLib.Furball memory furball, address from, address to
   ) external virtual override onlyFurballs {
+    // Check that this zone allows trading...
+    // uint32 overrideZone = zones.furballZones(tokenId);
+    // if (overrideZone > 0) {
+    //   ZoneLib.ZoneModifier memory zoneMod = zones.getModifier(overrideZone);
+    //   require(!zoneMod.staked, "STAKED");
+    // }
+    if (from != address(0)) { // P2P Trade (not a mint)
+    }
+
     Governance gov = furballs.governance();
     if (from != address(0)) gov.updateAccount(from, furballs.balanceOf(from) - 1);
     if (to != address(0)) gov.updateAccount(to, furballs.balanceOf(to) + 1);
@@ -187,7 +204,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     uint16 energy = modifiers.energyPoints;
     uint16 weight = furball.weight;
     uint16 expPercent = modifiers.expPercent + modifiers.happinessPoints;
-    uint16 luckPercent = contextual ? 0 : modifiers.luckPercent + modifiers.happinessPoints;
+    uint16 luckPercent = modifiers.luckPercent + modifiers.happinessPoints;
     uint16 furPercent = contextual ? 0 : modifiers.furPercent + _furBoost(furball.level) + energy;
 
     // First add in the inventory
@@ -217,7 +234,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     // ---------------------------------------------------------------------------------------------
 
     // Calculate weight & reduce luck
-    if (!contextual && weight > 0) {
+    if (weight > 0) {
       if (energy > 0) {
         weight = (energy >= weight) ? 0 : (weight - energy);
       }
@@ -227,7 +244,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     }
 
     modifiers.furPercent = contextual ? 0 : furPercent;
-    modifiers.luckPercent = contextual ? 0 : luckPercent;
+    modifiers.luckPercent = luckPercent;
     modifiers.expPercent = expPercent;
 
     return modifiers;
@@ -239,8 +256,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   ) external virtual override view returns(bytes memory) {
     FurLib.FurballStats memory stats = furballs.stats(tokenId, false);
     return abi.encodePacked(
-      furballs.furgreement().attributesMetadata(stats, maxExperience),
-      MetaData.trait("Zone", stats.definition.zone < 0x10000 ? "Explore" : "Battle"),
+      zones.attributesMetadata(stats, tokenId, maxExperience),
       MetaData.traitValue("Rare Genes Boost", stats.definition.rarity),
       MetaData.traitNumber("Edition", (tokenId & 0xFF) + 1),
       MetaData.traitNumber("Unique Loot Collected", stats.definition.inventory.length),

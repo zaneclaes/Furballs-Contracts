@@ -7,6 +7,9 @@ import "./LootEngine.sol";
 /// @author LFG Gaming LLC
 /// @notice Concrete implementation of LootEngine
 contract EngineA is LootEngine {
-  constructor(address furballs, address tradeProxy, address companyProxy, address snacksAddr)
-    LootEngine(furballs, tradeProxy, companyProxy, snacksAddr) { }
+  constructor(address furballs,
+    address snacksAddr, address zonesAddr,
+    address tradeProxy, address companyProxy
+  )
+    LootEngine(furballs, snacksAddr, zonesAddr, tradeProxy, companyProxy) { }
 }

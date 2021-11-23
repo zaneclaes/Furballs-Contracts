@@ -12,6 +12,20 @@ library ZoneLib {
     uint32 fur;
   }
 
+  struct ZoneModifier {
+    bool staked;            // Furballs are not tradeable here
+    uint16 expAdd;
+    uint16 expMult;
+    uint16 furAdd;
+    uint16 furMult;
+    uint16 luckAdd;
+    uint16 luckMult;
+    uint16 happinessAdd;
+    uint16 happinessMult;
+    uint16 energyAdd;
+    uint16 energyMult;
+  }
+
   /// @notice Checks if this is a pool zone, returning the pool type
   function poolZone(uint32 zone) internal pure returns(uint256) {
     if (zone < 0x10000) return 0;

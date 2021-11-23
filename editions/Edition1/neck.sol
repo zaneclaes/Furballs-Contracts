@@ -19,8 +19,10 @@ contract FurballsEdition1neck is IFurballPart {
     _options[0].push(8);
     _options[1].push(9);
     _options[3].push(10);
-    _options[4].push(11);
     _options[2].push(12);
+
+    // Patch: Furdenza
+    _options[3].push(11);
   }
 
   function slot() external pure override returns(string memory) {

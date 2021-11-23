@@ -13,11 +13,13 @@ contract FurballsEdition1body is IFurballPart {
     _options[0].push(2);
     _options[1].push(3);
     _options[0].push(4);
-    _options[4].push(5);
     _options[0].push(6);
     _options[2].push(7);
     _options[0].push(8);
     _options[3].push(9);
+
+    // Patch: Furdenza
+    _options[3].push(5);
   }
 
   function slot() external pure override returns(string memory) {
