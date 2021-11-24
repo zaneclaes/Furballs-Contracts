@@ -11,7 +11,6 @@ import "../utils/ProxyRegistry.sol";
 import "../utils/Dice.sol";
 import "../utils/Governance.sol";
 import "../utils/MetaData.sol";
-import "./ZoneLib.sol";
 import "./Zones.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
@@ -61,7 +60,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
 
   /// @notice Gets called at the beginning of token render; zones are able to render BKs
   function render(uint256 tokenId) external virtual override view returns(string memory) {
-    return zones.getBackgroundSvg(tokenId);
+    return zones.render(tokenId);
   }
 
   /// @notice Checking the zone may use _require to detect preconditions.
@@ -117,13 +116,9 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   function onTrade(
     FurLib.Furball memory furball, address from, address to
   ) external virtual override onlyFurballs {
-    // Check that this zone allows trading...
-    // uint32 overrideZone = zones.furballZones(tokenId);
-    // if (overrideZone > 0) {
-    //   ZoneLib.ZoneModifier memory zoneMod = zones.getModifier(overrideZone);
-    //   require(!zoneMod.staked, "STAKED");
-    // }
     if (from != address(0)) { // P2P Trade (not a mint)
+      uint zoneNum = zones.getZoneNumber(furball.number, furball.zone);
+      require(zoneNum == 0, "STAKED");
     }
 
     Governance gov = furballs.governance();
