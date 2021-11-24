@@ -122,11 +122,16 @@ contract Zones is FurProxy {
 
   /// @notice Caches ID/number as a byproduct
   /// @dev When a furball changes zone, we need to clear the lastGain timestamp
-  function _enterZone(uint256 tokenId, uint32 zone) internal {
+  function _enterZone(uint256 tokenId, uint32 zoneNum) internal {
     lastGain[tokenId].timestamp = 0;
     lastGain[tokenId].experience = 0;
-    furballZones[tokenId] = (zone + 1);
+    furballZones[tokenId] = (zoneNum + 1);
     _cacheFurballNumber(tokenId);
+
+    if (zoneNum == 0 || zoneNum == 0x10000) return;
+    // Additional requirement logic may occur in the zone
+    IZone zone = zoneMap[zoneNum];
+    if (address(zone) != address(0)) zone.enterZone(tokenId);
   }
 
   /// @notice Caches a mapping so we can get from furball num => ID

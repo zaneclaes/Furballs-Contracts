@@ -15,6 +15,8 @@ interface IZone is IERC165 {
   function name() external view returns(string memory);
 
   function background() external view returns(string memory);
+
+  function enterZone(uint256 tokenId) external;
 }
 
 
@@ -32,6 +34,11 @@ contract ZoneDefinition is ERC165, IZone, FurProxy {
   function update(string calldata zoneName, string calldata zoneBk) external gameAdmin {
     name = zoneName;
     background = zoneBk;
+  }
+
+  /// @notice A zone can hook a furball's entry...
+  function enterZone(uint256 tokenId) external override gameAdmin {
+    // Nothing to see here.
   }
 
   function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
