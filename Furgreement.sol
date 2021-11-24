@@ -4,6 +4,8 @@ pragma solidity ^0.8.6;
 import "./Furballs.sol";
 import "./Fur.sol";
 import "./utils/FurProxy.sol";
+import "./engines/Zones.sol";
+import "./engines/SnackShop.sol";
 import "./utils/MetaData.sol";
 import "./l2/L2Lib.sol";
 import "./l2/Fuel.sol";
@@ -20,9 +22,6 @@ contract Furgreement is EIP712, FurProxy {
 
   // Simple, fast check for a single allowed proxy...
   address private _job;
-
-  // // All zone changes from a round, executed at once
-  // mapping(uint32 => uint256[]) private _pendingZones;
 
   constructor(
     address furballsAddress, address fuelAddress
@@ -49,6 +48,7 @@ contract Furgreement is EIP712, FurProxy {
       zoneCounts[i] = 0;
     }
 
+    // Validate & run TK on each request
     for (uint i=0; i<tkRequests.length; i++) {
       L2Lib.TimekeeperRequest memory tkRequest = tkRequests[i];
       uint errorCode = _runTimekeeper(tkRequest, signatures[i]);
@@ -58,6 +58,7 @@ contract Furgreement is EIP712, FurProxy {
         FurLib.uint2str(errorCode)
       )));
 
+      // Each "round" in the request represents a Furball
       for (uint i=0; i<tkRequest.rounds.length; i++) {
         _resolveRound(tkRequest.rounds[i], tkRequest.sender);
 
@@ -68,29 +69,10 @@ contract Furgreement is EIP712, FurProxy {
         uint zc = zoneCounts[zi];
         tokenIds[zi][zc] = tkRequest.rounds[i].tokenId;
         zoneCounts[zi] = uint32(zc + 1);
-
-        // tokenIds[fbIdx] = tkRequest.rounds[i].tokenId;
-        // fbIdx++;
-        // if (fbIdx >= numMovedFurballs) {
-        //   // Group ended; move furballs
-        //   uint32 zoneNum = uint32(furballMoves[moveIdx] >> 8);
-        //   if (zoneNum == 0 || zoneNum == 0x10000) {
-        //     furballs.playMany(tokenIds, zoneNum, address(this));
-        //   } else {
-        //     furballs.engine().zones().overrideZone(tokenIds, zoneNum);
-        //   }
-
-        //   // Next group?
-        //   moveIdx++;
-        //   if (moveIdx >= furballMoves.length) break;
-        //   numMovedFurballs = uint8(furballMoves[moveIdx]);
-        //   if (numMovedFurballs == 0) break;
-
-        //   tokenIds = new uint256[](numMovedFurballs);
-        // }
       }
     }
 
+    // Finally, move furballs.
     for (uint i=0; i<numZones; i++) {
       uint32 zoneNum = zoneNums[i];
       if (zoneNum == 0 || zoneNum == 0x10000) {
@@ -132,15 +114,6 @@ contract Furgreement is EIP712, FurProxy {
       // Spend the FUR required for these actions
       furballs.fur().spend(tkRequest.sender, tkRequest.furSpent);
     }
-
-    // Each round represents a furball; every furball is moved is zones
-    // uint256[] memory moveFurballIds = zoneNumOffset > 0 ? new uint256[](tkRequest.rounds.length) :
-    //   new uint256[](0);
-    // for (uint i=0; i<tkRequest.rounds.length; i++) {
-    //   _resolveRound(tkRequest.rounds[i], tkRequest.sender);
-    //   if (zoneNumOffset > 0) moveFurballIds[i] = tkRequest.rounds[i].tokenId;
-    // }
-    // if (zoneNumOffset > 0) furballs.playMany(moveFurballIds, zoneNumOffset - 1, address(this));
 
     // Mint new furballs from an edition
     if (tkRequest.mintCount > 0) {
@@ -199,10 +172,9 @@ contract Furgreement is EIP712, FurProxy {
       }
     }
 
-    // And give away snacks (FUR spending done separately)
-    for (uint i=0; i<round.snackStacks.length; i++) {
-      uint64 stack = round.snackStacks[i];
-      furballs.fur().giveSnack(round.tokenId, uint32(stack >> 16), uint16(stack));
+    // Directly assign snacks...
+    if (round.snackStacks.length > 0) {
+      furballs.engine().snacks().giveSnacks(round.tokenId, round.snackStacks);
     }
   }
 

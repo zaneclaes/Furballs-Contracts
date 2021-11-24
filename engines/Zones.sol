@@ -116,13 +116,16 @@ contract Zones is FurProxy {
     lastGain[tokenId].timestamp = 0;
     lastGain[tokenId].experience = 0;
     furballZones[tokenId] = zone;
+    _cacheFurballNumber(tokenId);
+  }
 
-    if (tokenIdToFurballNumber[tokenId] == 0) {
-      FurLib.FurballStats memory stats = furballs.stats(tokenId, true);
-      uint32 number = stats.definition.number;
-      tokenIdToFurballNumber[tokenId] = number;
-      furballNumberToTokenId[number] = tokenId;
-    }
+  /// @notice Caches a mapping so we can get from furball num => ID
+  function _cacheFurballNumber(uint256 tokenId) internal {
+    if (tokenIdToFurballNumber[tokenId] != 0) return;
+    FurLib.FurballStats memory stats = furballs.stats(tokenId, true);
+    uint32 number = stats.definition.number;
+    tokenIdToFurballNumber[tokenId] = number;
+    furballNumberToTokenId[number] = tokenId;
   }
 
   /// @notice Public display (OpenSea, etc.)

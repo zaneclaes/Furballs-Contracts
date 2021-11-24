@@ -5,12 +5,14 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "../editions/IFurballEdition.sol";
 import "../utils/FurLib.sol";
 import "./Zones.sol";
+import "./SnackShop.sol";
 
 /// @title ILootEngine
 /// @author LFG Gaming LLC
 /// @notice The loot engine is patchable by replacing the Furballs' engine with a new version
 interface ILootEngine is IERC165 {
-  function zones() external returns(Zones);
+  function snacks() external view returns(SnackShop);
+  function zones() external view returns(Zones);
 
   /// @notice When a Furball comes back from exploration, potentially give it some loot.
   function dropLoot(uint32 intervals, FurLib.RewardModifiers memory mods) external returns(uint128);

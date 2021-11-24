@@ -14,20 +14,7 @@ contract Fur is ERC20, FurProxy {
   // Simple reason: this contract had more space, and is the only other allowed to know about ownership
   // Thus it serves as a sort of shop meta-store for Furballs
 
-  // tokenId => mapping of fed _snacks
-  mapping(uint256 => FurLib.Snack[]) public _snacks;
-
-  // tokenId => snackId => (snackId) + (stackSize)
-  mapping(uint256 => mapping(uint32 => uint96)) public snackStates;
-
-  // tokenId => snackId => (snackId) + (stackSize)
-  mapping(uint256 => mapping(uint32 => uint96)) public snackCounts;
-
-  // Internal cache for speed.
-  uint256 private _intervalDuration;
-
   constructor(address furballsAddress) FurProxy(furballsAddress) ERC20("Fur", "FUR") {
-    _intervalDuration = furballs.intervalDuration();
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -41,29 +28,18 @@ contract Fur is ERC20, FurProxy {
 
   /// @notice Returns the snacks currently applied to a Furball
   function snacks(uint256 tokenId) external view returns(FurLib.Snack[] memory) {
-    return _snacks[tokenId];
+    return furballs.engine().snacks().snacks(tokenId);
   }
 
   /// @notice Write-function to cleanup the snacks for a token (remove expired)
-  function cleanSnacks(uint256 tokenId) public returns (uint256) {
-    if (_snacks[tokenId].length == 0) return 0;
-    return _cleanSnack(tokenId, 0);
+  /// @dev Since migrating to SnackShop, this function no longer writes; it matches snackEffects
+  function cleanSnacks(uint256 tokenId) external view returns (uint256) {
+    return furballs.engine().snacks().snackEffects(tokenId);
   }
 
   /// @notice The public accessor calculates the snack boosts
   function snackEffects(uint256 tokenId) external view returns(uint256) {
-    uint16 hap = 0;
-    uint16 en = 0;
-
-    for (uint32 i=0; i<_snacks[tokenId].length && i <= FurLib.Max32; i++) {
-      uint256 remaining = _snackTimeRemaning(_snacks[tokenId][i]);
-      if (remaining > 0) {
-        hap += _snacks[tokenId][i].happiness;
-        en += _snacks[tokenId][i].energy;
-      }
-    }
-
-    return (hap * 0x10000) + (en);
+    return furballs.engine().snacks().snackEffects(tokenId);
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -132,68 +108,12 @@ contract Fur is ERC20, FurProxy {
     // _gift will throw if cannot gift or cannot afford costQ
     _gift(from, permissions, furballs.ownerOf(tokenId), snack.furCost * count);
 
-    snack.count *= count;
-    _assignSnack(snack, tokenId);
-  }
-
-  /// @notice Shortcut for admins/timekeeper
-  function giveSnack(
-    uint256 tokenId, uint32 snackId, uint16 count
-  ) external gameAdmin {
-    snackStates[tokenId][snackId] = uint96(block.timestamp * 0x100000000 + count);
-    // _assignSnack(snack, tokenId);
+    furballs.engine().snacks().giveSnack(tokenId, snackId, count);
   }
 
   // -----------------------------------------------------------------------------------------------
   // Internal
   // -----------------------------------------------------------------------------------------------
-
-  function _assignSnack(FurLib.Snack memory snack, uint256 tokenId) internal {
-    uint256 snackData = 0; //_cleanSnack(tokenId, snack.snackId);
-    uint32 existingSnackNumber = uint32(snackData / 0x100000000);
-    if (existingSnackNumber > 0) {
-      // Adding count effectively adds duration to the active snack
-      _snacks[tokenId][existingSnackNumber - 1].count += snack.count;
-    } else {
-      // A new snack just gets pushed onto the array
-      snack.fed = uint64(block.timestamp);
-      _snacks[tokenId].push(snack);
-    }
-  }
-
-  /// @notice Both removes inactive _snacks from a token and searches for a specific snack Id index
-  /// @dev Both at once saves some size & ensures that the _snacks are frequently cleaned.
-  /// @return The index+1 of the existing snack
-  function _cleanSnack(uint256 tokenId, uint32 snackId) internal returns(uint256) {
-    uint32 ret = 0;
-    uint16 hap = 0;
-    uint16 en = 0;
-    for (uint32 i=1; i<=_snacks[tokenId].length && i <= FurLib.Max32; i++) {
-      FurLib.Snack memory snack = _snacks[tokenId][i-1];
-      // Has the snack transitioned from active to inactive?
-      if (_snackTimeRemaning(snack) == 0) {
-        if (_snacks[tokenId].length > 1) {
-          _snacks[tokenId][i-1] = _snacks[tokenId][_snacks[tokenId].length - 1];
-        }
-        _snacks[tokenId].pop();
-        i--; // Repeat this idx
-        continue;
-      }
-      hap += snack.happiness;
-      en += snack.energy;
-      if (snackId != 0 && snack.snackId == snackId) {
-        ret = i;
-      }
-    }
-    return (ret * 0x100000000) + (hap * 0x10000) + (en);
-  }
-
-  /// @notice Check if the snack is active; returns 0 if inactive, otherwise the duration
-  function _snackTimeRemaning(FurLib.Snack memory snack) internal view returns(uint256) {
-    if (snack.fed == 0) return 0;
-    uint256 expiresAt = uint256(snack.fed + (snack.count * snack.duration * _intervalDuration));
-    return expiresAt <= block.timestamp ? 0 : (expiresAt - block.timestamp);
-  }
 
   /// @notice Enforces (requires) only admins/game may give gifts
   /// @param to Whom is this being sent to?

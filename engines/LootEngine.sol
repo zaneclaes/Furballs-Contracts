@@ -28,7 +28,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   Zones override public zones;
 
   // Simple storage of snack definitions
-  SnackShop public snackShop;
+  SnackShop override public snacks;
 
   uint32 maxExperience = 2010000;
 
@@ -39,7 +39,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   ) FurProxy(furballsAddress) {
     _proxies = ProxyRegistry(tradeProxy);
     companyWalletProxy = companyProxy;
-    snackShop = SnackShop(snacksAddr);
+    snacks = SnackShop(snacksAddr);
     zones = Zones(zonesAddr);
   }
 
@@ -190,7 +190,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
 
   /// @notice The snack shop has IDs for each snack definition
   function getSnack(uint32 snackId) external view virtual override returns(FurLib.Snack memory) {
-    return snackShop.getSnack(snackId);
+    return snacks.getSnack(snackId);
   }
 
   /// @notice Layers on LootEngine modifiers to rewards
