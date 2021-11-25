@@ -16,10 +16,6 @@ contract Zones is FurProxy {
   // Override of tokenId => zoneNum
   mapping(uint256 => uint32) private furballZones;
 
-  // Simple reverse lookup
-  mapping(uint32 => uint256) public furballNumberToTokenId;
-  mapping(uint256 => uint32) private tokenIdToFurballNumber;
-
   // Internal tracker for a furball when gaining in the zone
   struct LastGain {
     uint32 total;
@@ -35,12 +31,6 @@ contract Zones is FurProxy {
   // -----------------------------------------------------------------------------------------------
   // Public
   // -----------------------------------------------------------------------------------------------
-
-  /// @notice Lookup of real zone number (using overrides)
-  function getZoneNumber(uint32 furballNumber, uint32 defaultZone) external view returns(uint) {
-    uint256 tokenId = furballNumberToTokenId[furballNumber];
-    return (tokenId == 0 || furballZones[tokenId] == 0) ? defaultZone : (furballZones[tokenId] - 1);
-  }
 
   /// @notice When a furball earns EXP via Timekeeper
   function addExp(uint256 tokenId, uint32 exp) external gameAdmin {
@@ -126,21 +116,12 @@ contract Zones is FurProxy {
     lastGain[tokenId].timestamp = 0;
     lastGain[tokenId].experience = 0;
     furballZones[tokenId] = (zoneNum + 1);
-    _cacheFurballNumber(tokenId);
+    // _cacheFurballNumber(tokenId);
 
     if (zoneNum == 0 || zoneNum == 0x10000) return;
     // Additional requirement logic may occur in the zone
     IZone zone = zoneMap[zoneNum];
     if (address(zone) != address(0)) zone.enterZone(tokenId);
-  }
-
-  /// @notice Caches a mapping so we can get from furball num => ID
-  function _cacheFurballNumber(uint256 tokenId) internal {
-    if (tokenIdToFurballNumber[tokenId] != 0) return;
-    FurLib.FurballStats memory stats = furballs.stats(tokenId, true);
-    uint32 number = stats.definition.number;
-    tokenIdToFurballNumber[tokenId] = number;
-    furballNumberToTokenId[number] = tokenId;
   }
 
   /// @notice Public display (OpenSea, etc.)

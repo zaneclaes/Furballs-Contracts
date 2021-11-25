@@ -116,10 +116,10 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   function onTrade(
     FurLib.Furball memory furball, address from, address to
   ) external virtual override onlyFurballs {
-    if (from != address(0)) { // P2P Trade (not a mint)
-      uint zoneNum = zones.getZoneNumber(furball.number, furball.zone);
-      require(zoneNum == 0, "STAKED");
-    }
+    // if (from != address(0)) { // P2P Trade (not a mint)
+    //   uint zoneNum = zones.getZoneNumber(furball.number, furball.zone);
+    //   require(zoneNum == 0, "STAKED");
+    // }
 
     Governance gov = furballs.governance();
     if (from != address(0)) gov.updateAccount(from, furballs.balanceOf(from) - 1);
