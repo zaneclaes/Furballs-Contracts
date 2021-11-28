@@ -38,11 +38,6 @@ abstract contract FurProxy {
     _;
   }
 
-  modifier onlyFurballs() {
-    require(msg.sender == address(furballs), "FBL");
-    _;
-  }
-
   /// @notice Generalized permissions flag for a given address
   function _permissionCheck(address addr) internal view returns (uint) {
     if(addr != address(0)) {

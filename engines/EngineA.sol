@@ -8,8 +8,7 @@ import "./LootEngine.sol";
 /// @notice Concrete implementation of LootEngine
 contract EngineA is LootEngine {
   constructor(address furballs,
-    address snacksAddr, address zonesAddr, address boostsAddr,
+    address snacksAddr, address zonesAddr,
     address tradeProxy, address companyProxy
-  )
-    LootEngine(furballs, snacksAddr, zonesAddr, boostsAddr, tradeProxy, companyProxy) { }
+  ) LootEngine(furballs, snacksAddr, zonesAddr, tradeProxy, companyProxy) { }
 }

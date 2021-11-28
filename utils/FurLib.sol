@@ -78,6 +78,16 @@ library FurLib {
     uint16 count;
   }
 
+  // Internal tracker for a furball when gaining in the zone
+  struct ZoneReward {
+    uint8 mode;
+    uint16 rarity;
+    uint32 zone;
+    uint32 fur;
+    uint32 experience;
+    uint64 timestamp;
+  }
+
   uint32 public constant Max32 = type(uint32).max;
 
   uint8 public constant PERMISSION_USER = 1;

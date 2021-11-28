@@ -3,7 +3,6 @@ pragma solidity ^0.8.6;
 
 import "./ILootEngine.sol";
 import "./SnackShop.sol";
-import "./Boosts.sol";
 import "../editions/IFurballEdition.sol";
 import "../Furballs.sol";
 import "../utils/FurLib.sol";
@@ -30,28 +29,22 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   // Simple storage of snack definitions
   SnackShop override public snacks;
 
-  // Stores furball stat boosts
-  Boosts private boosts;
-
   uint32 maxExperience = 2010000;
 
   constructor(
     address furballsAddress,
-    address snacksAddr, address zonesAddr, address boostsAddr,
+    address snacksAddr, address zonesAddr,
     address tradeProxy, address companyProxy
   ) FurProxy(furballsAddress) {
     _proxies = ProxyRegistry(tradeProxy);
     companyWalletProxy = companyProxy;
     snacks = SnackShop(snacksAddr);
     zones = Zones(zonesAddr);
-    boosts = Boosts(boostsAddr);
   }
 
-  /// @notice Loot can have different weight to help prevent over-powering a furball
-  /// @dev Each point of weight can be offset by a point of energy; the result reduces luck
-  function weightOf(uint128 lootId) external virtual override pure returns (uint16) {
-    return 2;
-  }
+  // -----------------------------------------------------------------------------------------------
+  // Display
+  // -----------------------------------------------------------------------------------------------
 
   /// @notice Gets called for Metadata
   function furballDescription(uint256 tokenId) external virtual override view returns (string memory) {
@@ -68,65 +61,41 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     return zones.render(tokenId);
   }
 
+  // -----------------------------------------------------------------------------------------------
+  // Public
+  // -----------------------------------------------------------------------------------------------
+
+  /// @notice Loot can have different weight to help prevent over-powering a furball
+  /// @dev Each point of weight can be offset by a point of energy; the result reduces luck
+  function weightOf(uint128 lootId) external virtual override pure returns (uint16) {
+    return 2;
+  }
+
   /// @notice Checking the zone may use _require to detect preconditions.
   function enterZone(
     uint256 tokenId, uint32 zone, uint256[] memory team
   ) external virtual override returns(uint256) {
-    return zones.enterZone(tokenId, zone);
+    zones.enterZone(tokenId, zone);
+    return zone;
   }
 
   /// @notice Proxy logic is presently delegated to OpenSea-like contract
   function canProxyTrades(
     address owner, address operator
-  ) external virtual override view onlyFurballs returns(bool) {
+  ) external virtual override view returns(bool) {
     if (address(_proxies) == address(0)) return false;
     return address(_proxies.proxies(owner)) == operator;
   }
 
   /// @notice Allow a player to play? Throws on error if not.
   /// @dev This is core gameplay security logic
-  function approveSender(address sender) external virtual override view onlyFurballs returns(uint) {
+  function approveSender(address sender) external virtual override view returns(uint) {
     if (sender == address(0)) return 0;
 
     if (sender == companyWalletProxy) return FurLib.PERMISSION_OWNER;
     if (sender == address(furballs.furgreement())) return FurLib.PERMISSION_CONTRACT;
 
     return _permissions(sender);
-  }
-
-  /// @notice Calculates new level for experience
-  function onExperience(
-    FurLib.Furball memory furball, address owner, uint32 experience
-  ) external virtual override onlyFurballs returns(uint32 totalExp, uint16 levels) {
-    if (experience == 0) return (0, 0);
-
-    uint32 has = furball.experience;
-    uint32 max = maxExperience;
-    totalExp = (experience < max && has < (max - experience)) ? (has + experience) : max;
-
-    // Calculate new level & check for level-up
-    uint16 oldLevel = furball.level;
-    uint16 level = uint16(FurLib.expToLevel(totalExp, max));
-    levels = level > oldLevel ? (level - oldLevel) : 0;
-
-    if (levels > 0) {
-      // Update community standing
-      furballs.governance().updateMaxLevel(owner, level);
-    }
-
-    return (totalExp, levels);
-  }
-
-  /// @notice The trade hook can update balances or assign rewards
-  function onTrade(
-    FurLib.Furball memory furball, address from, address to
-  ) external virtual override onlyFurballs {
-    // Do the first computation of the Furball's boosts
-    if (from == address(0)) boosts.compute(furball.number, 0);
-
-    Governance gov = furballs.governance();
-    if (from != address(0)) gov.updateAccount(from, furballs.balanceOf(from) - 1);
-    if (to != address(0)) gov.updateAccount(to, furballs.balanceOf(to) + 1);
   }
 
   /// @notice Attempt to upgrade a given piece of loot (item ID)
@@ -157,33 +126,13 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   function dropLoot(
     uint32 intervals,
     FurLib.RewardModifiers memory modifiers
-  ) external virtual override onlyFurballs returns(uint128) {
-    // Only battles drop loot.
+  ) external virtual override returns(uint128) {
+    // Only explore drops loot.
     if (modifiers.zone >= 0x10000) return 0;
 
-    (uint8 rarity, uint8 stat) = rollRarityStat(
+    (uint8 rarity, uint8 stat) = _rollRarityStat(
       uint32((intervals * uint256(modifiers.luckPercent)) /100), 0);
     return _packLoot(rarity, stat);
-  }
-
-  function _packLoot(uint16 rarity, uint16 stat) internal pure returns(uint128) {
-    return rarity == 0 ? 0 : (uint16(rarity) * 0x10000) + (stat * 0x100);
-  }
-
-  /// @notice Core loot drop rarity randomization
-  /// @dev exposes an interface helpful for the unit tests, but is not otherwise called publicly
-  function rollRarityStat(uint32 chance, uint32 seed) public returns(uint8, uint8) {
-    if (chance == 0) return (0, 0);
-    uint32 threshold = 4320;
-    uint32 rolled = roll(seed) % threshold;
-    uint8 stat = uint8(rolled % 2);
-
-    if (chance > threshold || rolled >= (threshold - chance)) return (3, stat);
-    threshold -= chance;
-    if (chance * 3 > threshold || rolled >= (threshold - chance * 3)) return (2, stat);
-    threshold -= chance * 3;
-    if (chance * 6 > threshold || rolled >= (threshold - chance * 6)) return (1, stat);
-    return (0, stat);
   }
 
   /// @notice The snack shop has IDs for each snack definition
@@ -199,18 +148,16 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     bool contextual
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Use temporary variables is more gas-efficient than accessing them off the struct
-    uint16 rarity = uint16(boosts.rarityOf(furball.number));
-    uint16 energy = modifiers.energyPoints;
-    uint16 weight = furball.weight;
-    uint16 expPercent = modifiers.expPercent + modifiers.happinessPoints + rarity;
-    uint16 luckPercent = modifiers.luckPercent + modifiers.happinessPoints;
-    uint16 furPercent = contextual ? 0 : modifiers.furPercent + _furBoost(furball.level) + energy + rarity;
+    FurLib.ZoneReward memory zr = zones.getFurballZoneReward(furball.number);
+    bool zeroed = contextual && zr.mode == 0;
+    uint16 expPercent = modifiers.expPercent + modifiers.happinessPoints + zr.rarity;
+    uint16 furPercent = zeroed ? 0 : modifiers.furPercent + _furBoost(furball.level) + zr.rarity;
 
     // First add in the inventory
     for (uint256 i=0; i<furball.inventory.length; i++) {
       uint128 lootId = uint128(furball.inventory[i] / 0x100);
       (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
-      if (stat == 1 && contextual) continue;
+      if (stat == 1 && zeroed) continue;
 
       uint32 stackSize = uint32(furball.inventory[i] & 0xFF);
       uint16 boost = uint16(_lootRarityBoost(rarity) * stackSize);
@@ -225,26 +172,13 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     if (account.numFurballs > 1) {
       uint16 amt = uint16(2 * (account.numFurballs <= 10 ? (account.numFurballs - 1) : 10));
       expPercent += amt;
-      if (!contextual) furPercent += amt;
+      if (!zeroed) furPercent += amt;
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Negative impacts come last, so subtraction does not underflow.
-    // ---------------------------------------------------------------------------------------------
-
-    // Calculate weight & reduce luck
-    if (weight > 0) {
-      if (energy > 0) {
-        weight = (energy >= weight) ? 0 : (weight - energy);
-      }
-      if (weight > 0) {
-        luckPercent = weight >= luckPercent ? 0 : (luckPercent - weight);
-      }
-    }
-
-    modifiers.furPercent = contextual ? 0 : furPercent;
-    modifiers.luckPercent = luckPercent;
-    modifiers.expPercent = expPercent;
+    modifiers.luckPercent = _luckBoosts(
+      modifiers.luckPercent + modifiers.happinessPoints, furball.weight, modifiers.energyPoints);
+    modifiers.furPercent = zeroed ? 0 : _timeScalePercent(furPercent, furball.last, zr.timestamp);
+    modifiers.expPercent = _timeScalePercent(expPercent, furball.last, zr.timestamp);
 
     return modifiers;
   }
@@ -264,6 +198,90 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
       MetaData.traitDate("Acquired", stats.definition.trade),
       MetaData.traitDate("Birthday", stats.definition.birth)
     );
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  // GameAdmin
+  // -----------------------------------------------------------------------------------------------
+
+  /// @notice The trade hook can update balances or assign rewards
+  function onTrade(
+    FurLib.Furball memory furball, address from, address to
+  ) external virtual override gameAdmin {
+    // Do the first computation of the Furball's boosts
+    if (from == address(0)) zones.computeStats(furball.number, 0);
+
+    Governance gov = furballs.governance();
+    if (from != address(0)) gov.updateAccount(from, furballs.balanceOf(from) - 1);
+    if (to != address(0)) gov.updateAccount(to, furballs.balanceOf(to) + 1);
+  }
+
+  /// @notice Calculates new level for experience
+  function onExperience(
+    FurLib.Furball memory furball, address owner, uint32 experience
+  ) external virtual override gameAdmin returns(uint32 totalExp, uint16 levels) {
+    if (experience == 0) return (0, 0);
+
+    uint32 has = furball.experience;
+    uint32 max = maxExperience;
+    totalExp = (experience < max && has < (max - experience)) ? (has + experience) : max;
+
+    // Calculate new level & check for level-up
+    uint16 oldLevel = furball.level;
+    uint16 level = uint16(FurLib.expToLevel(totalExp, max));
+    levels = level > oldLevel ? (level - oldLevel) : 0;
+
+    if (levels > 0) {
+      // Update community standing
+      furballs.governance().updateMaxLevel(owner, level);
+    }
+
+    return (totalExp, levels);
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  // Internal
+  // -----------------------------------------------------------------------------------------------
+
+  /// @notice After Timekeeper, rewards need to be scaled by the remaining time
+  function _timeScalePercent(
+    uint16 percent, uint64 furballLast, uint64 zoneLast
+  ) internal view returns(uint16) {
+    if (furballLast >= zoneLast) return percent; // TK was not more recent
+    return uint16((uint64(percent) * (uint64(block.timestamp) - zoneLast)) / furballLast);
+  }
+
+  function _luckBoosts(uint16 luckPercent, uint16 weight, uint16 energy) internal pure returns(uint16) {
+    // Calculate weight & reduce luck
+    if (weight > 0) {
+      if (energy > 0) {
+        weight = (energy >= weight) ? 0 : (weight - energy);
+      }
+      if (weight > 0) {
+        luckPercent = weight >= luckPercent ? 0 : (luckPercent - weight);
+      }
+    }
+    return luckPercent;
+  }
+
+  /// @notice Core loot drop rarity randomization
+  /// @dev exposes an interface helpful for the unit tests, but is not otherwise called publicly
+  function _rollRarityStat(uint32 chance, uint32 seed) internal returns(uint8, uint8) {
+    if (chance == 0) return (0, 0);
+    uint32 threshold = 4320;
+    uint32 rolled = roll(seed) % threshold;
+    uint8 stat = uint8(rolled % 2);
+
+    if (chance > threshold || rolled >= (threshold - chance)) return (3, stat);
+    threshold -= chance;
+    if (chance * 3 > threshold || rolled >= (threshold - chance * 3)) return (2, stat);
+    threshold -= chance * 3;
+    if (chance * 6 > threshold || rolled >= (threshold - chance * 6)) return (1, stat);
+    return (0, stat);
+  }
+
+  function _packLoot(uint16 rarity, uint16 stat) internal pure returns(uint128) {
+    return rarity == 0 ? 0 : (uint16(rarity) * 0x10000) + (stat * 0x100);
   }
 
   function _lootRarityBoost(uint16 rarity) internal pure returns (uint16) {
@@ -314,4 +332,22 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
       interfaceId == type(ILootEngine).interfaceId ||
       super.supportsInterface(interfaceId);
   }
+  // function _inventoryBoosts(
+  //   uint256[] memory inventory, bool contextual
+  // ) internal view returns(uint16 expPercent, uint16 furPercent) {
+  //   for (uint256 i=0; i<inventory.length; i++) {
+  //     uint128 lootId = uint128(inventory[i] / 0x100);
+  //     (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
+  //     if (stat == 1 && contextual) continue;
+
+  //     uint32 stackSize = uint32(inventory[i] & 0xFF);
+  //     uint16 boost = uint16(_lootRarityBoost(rarity) * stackSize);
+  //     if (stat == 0) {
+  //       expPercent += boost;
+  //     } else {
+  //       furPercent += boost;
+  //     }
+  //   }
+  // }
+
 }
