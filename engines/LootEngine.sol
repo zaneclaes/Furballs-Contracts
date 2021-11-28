@@ -3,6 +3,7 @@ pragma solidity ^0.8.6;
 
 import "./ILootEngine.sol";
 import "./SnackShop.sol";
+import "./Boosts.sol";
 import "../editions/IFurballEdition.sol";
 import "../Furballs.sol";
 import "../utils/FurLib.sol";
@@ -29,17 +30,21 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   // Simple storage of snack definitions
   SnackShop override public snacks;
 
+  // Stores furball stat boosts
+  Boosts private boosts;
+
   uint32 maxExperience = 2010000;
 
   constructor(
     address furballsAddress,
-    address snacksAddr, address zonesAddr,
+    address snacksAddr, address zonesAddr, address boostsAddr,
     address tradeProxy, address companyProxy
   ) FurProxy(furballsAddress) {
     _proxies = ProxyRegistry(tradeProxy);
     companyWalletProxy = companyProxy;
     snacks = SnackShop(snacksAddr);
     zones = Zones(zonesAddr);
+    boosts = Boosts(boostsAddr);
   }
 
   /// @notice Loot can have different weight to help prevent over-powering a furball
@@ -116,10 +121,8 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   function onTrade(
     FurLib.Furball memory furball, address from, address to
   ) external virtual override onlyFurballs {
-    // if (from != address(0)) { // P2P Trade (not a mint)
-    //   uint zoneNum = zones.getZoneNumber(furball.number, furball.zone);
-    //   require(zoneNum == 0, "STAKED");
-    // }
+    // Do the first computation of the Furball's boosts
+    if (from == address(0)) boosts.compute(furball.number, 0);
 
     Governance gov = furballs.governance();
     if (from != address(0)) gov.updateAccount(from, furballs.balanceOf(from) - 1);
@@ -196,11 +199,12 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     bool contextual
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Use temporary variables is more gas-efficient than accessing them off the struct
+    uint16 rarity = uint16(boosts.rarityOf(furball.number));
     uint16 energy = modifiers.energyPoints;
     uint16 weight = furball.weight;
-    uint16 expPercent = modifiers.expPercent + modifiers.happinessPoints;
+    uint16 expPercent = modifiers.expPercent + modifiers.happinessPoints + rarity;
     uint16 luckPercent = modifiers.luckPercent + modifiers.happinessPoints;
-    uint16 furPercent = contextual ? 0 : modifiers.furPercent + _furBoost(furball.level) + energy;
+    uint16 furPercent = contextual ? 0 : modifiers.furPercent + _furBoost(furball.level) + energy + rarity;
 
     // First add in the inventory
     for (uint256 i=0; i<furball.inventory.length; i++) {

@@ -113,8 +113,10 @@ contract Zones is FurProxy {
   /// @notice Caches ID/number as a byproduct
   /// @dev When a furball changes zone, we need to clear the lastGain timestamp
   function _enterZone(uint256 tokenId, uint32 zoneNum) internal {
-    lastGain[tokenId].timestamp = 0;
-    lastGain[tokenId].experience = 0;
+    if (lastGain[tokenId].timestamp != 0) {
+      lastGain[tokenId].timestamp = 0;
+      lastGain[tokenId].experience = 0;
+    }
     furballZones[tokenId] = (zoneNum + 1);
     // _cacheFurballNumber(tokenId);
 
