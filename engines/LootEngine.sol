@@ -13,6 +13,7 @@ import "../utils/Governance.sol";
 import "../utils/MetaData.sol";
 import "./Zones.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+// import "hardhat/console.sol";
 
 /// @title LootEngine
 /// @author LFG Gaming LLC
@@ -105,6 +106,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     uint128 lootId,
     uint8 chances
   ) external virtual override returns(uint128) {
+    // upgradeLoot will never receive luckPercent==0 because its stats are noncontextual
     (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
 
     require(rarity > 0 && rarity < 3, "RARITY");
@@ -127,8 +129,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     uint32 intervals,
     FurLib.RewardModifiers memory modifiers
   ) external virtual override returns(uint128) {
-    // Only explore drops loot.
-    if (modifiers.zone >= 0x10000) return 0;
+    if (modifiers.luckPercent == 0) return 0;
 
     (uint8 rarity, uint8 stat) = _rollRarityStat(
       uint32((intervals * uint256(modifiers.luckPercent)) /100), 0);
@@ -149,15 +150,19 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   ) external virtual override view returns(FurLib.RewardModifiers memory) {
     // Use temporary variables is more gas-efficient than accessing them off the struct
     FurLib.ZoneReward memory zr = zones.getFurballZoneReward(furball.number);
-    bool zeroed = contextual && zr.mode == 0;
+    if (contextual && zr.mode == 0) {
+      modifiers.expPercent = 0;
+      modifiers.furPercent = 0;
+      return modifiers;
+    }
+
     uint16 expPercent = modifiers.expPercent + modifiers.happinessPoints + zr.rarity;
-    uint16 furPercent = zeroed ? 0 : modifiers.furPercent + _furBoost(furball.level) + zr.rarity;
+    uint16 furPercent = modifiers.furPercent + _furBoost(furball.level) + zr.rarity;
 
     // First add in the inventory
     for (uint256 i=0; i<furball.inventory.length; i++) {
       uint128 lootId = uint128(furball.inventory[i] / 0x100);
       (uint8 rarity, uint8 stat) = _itemRarityStat(lootId);
-      if (stat == 1 && zeroed) continue;
 
       uint32 stackSize = uint32(furball.inventory[i] & 0xFF);
       uint16 boost = uint16(_lootRarityBoost(rarity) * stackSize);
@@ -172,13 +177,15 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     if (account.numFurballs > 1) {
       uint16 amt = uint16(2 * (account.numFurballs <= 10 ? (account.numFurballs - 1) : 10));
       expPercent += amt;
-      if (!zeroed) furPercent += amt;
+      furPercent += amt;
     }
 
     modifiers.luckPercent = _luckBoosts(
       modifiers.luckPercent + modifiers.happinessPoints, furball.weight, modifiers.energyPoints);
-    modifiers.furPercent = zeroed ? 0 : _timeScalePercent(furPercent, furball.last, zr.timestamp);
-    modifiers.expPercent = _timeScalePercent(expPercent, furball.last, zr.timestamp);
+    modifiers.furPercent =
+      (contextual ? _timeScalePercent(furPercent, furball.last, zr.timestamp) : furPercent);
+    modifiers.expPercent =
+      (contextual ? _timeScalePercent(expPercent, furball.last, zr.timestamp) : expPercent);
 
     return modifiers;
   }
@@ -220,9 +227,9 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
   function onExperience(
     FurLib.Furball memory furball, address owner, uint32 experience
   ) external virtual override gameAdmin returns(uint32 totalExp, uint16 levels) {
-    if (experience == 0) return (0, 0);
-
-    uint32 has = furball.experience;
+    // Zones keep track of the "additional" EXP, accrued via TK (it will get zeroed on zone change)
+    FurLib.ZoneReward memory zr = zones.getFurballZoneReward(furball.number);
+    uint32 has = furball.experience + zr.experience;
     uint32 max = maxExperience;
     totalExp = (experience < max && has < (max - experience)) ? (has + experience) : max;
 
@@ -248,7 +255,7 @@ abstract contract LootEngine is ERC165, ILootEngine, Dice, FurProxy {
     uint16 percent, uint64 furballLast, uint64 zoneLast
   ) internal view returns(uint16) {
     if (furballLast >= zoneLast) return percent; // TK was not more recent
-    return uint16((uint64(percent) * (uint64(block.timestamp) - zoneLast)) / furballLast);
+    return uint16((uint64(percent) * (uint64(block.timestamp) - zoneLast)) / (uint64(block.timestamp) - furballLast));
   }
 
   function _luckBoosts(uint16 luckPercent, uint16 weight, uint16 energy) internal pure returns(uint16) {

@@ -80,7 +80,7 @@ library FurLib {
 
   // Internal tracker for a furball when gaining in the zone
   struct ZoneReward {
-    uint8 mode;
+    uint8 mode;         // 1==tk disabled
     uint16 rarity;
     uint32 zone;
     uint32 fur;

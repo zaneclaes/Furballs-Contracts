@@ -22,12 +22,30 @@ contract Zones is FurProxy {
   // Public
   // -----------------------------------------------------------------------------------------------
 
+  /// @notice Check if Timekeeper is enabled for a given tokenId
+  /// @dev TK=enabled by defauld (mode == 0); other modes (?); bools are expensive to store thus modes
+  function isTimekeeperEnabled(uint256 tokenId) external view returns(bool) {
+    return zoneRewards[tokenId].mode != 1;
+  }
+
   /// @notice Allow players to disable TK on their furballs
   function disableTimekeeper(uint256[] calldata tokenIds) external {
     for (uint i=0; i<tokenIds.length; i++) {
       require(furballs.ownerOf(tokenIds[i]) == msg.sender, "OWN");
       require(zoneRewards[tokenIds[i]].mode == 0, "MODE");
       zoneRewards[tokenIds[i]].mode = 1;
+      zoneRewards[tokenIds[i]].timestamp = uint64(block.timestamp);
+    }
+  }
+
+  /// @notice Allow players to disable TK on their furballs
+  /// @dev timestamp is not set because TK can read the furball last action,
+  ///       so it preserves more data and reduces gas to not keep track!
+  function enableTimekeeper(uint256[] calldata tokenIds) external {
+    for (uint i=0; i<tokenIds.length; i++) {
+      require(furballs.ownerOf(tokenIds[i]) == msg.sender, "OWN");
+      require(zoneRewards[tokenIds[i]].mode != 0, "MODE");
+      zoneRewards[tokenIds[i]].mode = 0;
     }
   }
 
@@ -93,6 +111,16 @@ contract Zones is FurProxy {
     _computeStats(furballNum, baseRarity);
   }
 
+  /// @notice Update the timestamps on Furballs
+  function timestampModes(
+    uint256[] calldata tokenIds, uint64[] calldata lastTimestamps, uint8[] calldata modes
+  ) external gameAdmin {
+    for (uint i=0; i<tokenIds.length; i++) {
+      zoneRewards[tokenIds[i]].timestamp = lastTimestamps[i];
+      zoneRewards[tokenIds[i]].mode = modes[i];
+    }
+  }
+
   /// @notice Update the modes
   function setModes(
     uint256[] calldata tokenIds, uint8[] calldata modes
@@ -121,6 +149,14 @@ contract Zones is FurProxy {
   function addExp(uint256 tokenId, uint32 exp) external gameAdmin {
     zoneRewards[tokenId].timestamp = uint64(block.timestamp);
     zoneRewards[tokenId].experience += exp;
+  }
+
+  /// @notice Bulk EXP option for efficiency
+  function addExps(uint256[] calldata tokenIds, uint32[] calldata exps) external gameAdmin {
+    for (uint i=0; i<tokenIds.length; i++) {
+      zoneRewards[tokenIds[i]].timestamp = uint64(block.timestamp);
+      zoneRewards[tokenIds[i]].experience = exps[i];
+    }
   }
 
   /// @notice Define the attributes of a zone
